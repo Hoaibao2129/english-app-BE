@@ -1,0 +1,26 @@
+[
+  {
+    "topic_name_en": "Daily Basics",
+    "topic_name_vn": "Cơ bản hằng ngày",
+    "words": [
+      { "en": "hello", "vn": "xin chào" },
+      { "en": "go/went/gone", "vn": "đi" },
+      { "en": "theatre/theater", "vn": "rạp hát" },
+      { "en": "book", "vn": "quyển sách" },
+      { "en": "book", "vn": "đặt chỗ" },
+      { "en": "water", "vn": "nước" }
+    ]
+  },
+  {
+    "topic_name_en": "Time & Calendar",
+    "topic_name_vn": "Thời gian và lịch",
+    "words": [
+      { "en": "period", "vn": "giai đoạn, thời kỳ" },
+      { "en": "week", "vn": "tuần" },
+      { "en": "month", "vn": "tháng" },
+      { "en": "year", "vn": "năm" },
+      { "en": "yesterday", "vn": "hôm qua" },
+      { "en": "tomorrow", "vn": "ngày mai" }
+    ]
+  }
+]
