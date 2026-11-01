@@ -17,7 +17,7 @@ export class AnswerLog {
   @Prop({ type: Types.ObjectId, ref: 'Topic', required: true })
   topic_id: Types.ObjectId;
 
-  @Prop({ type: String, enum: ['flashcard', 'quiz'], required: true })
+  @Prop({ type: String, enum: ['flashcard', 'quiz', 'review'], required: true })
   mode: StudyMode;
 
   @Prop({ type: String, enum: ['en_vi', 'vi_en'], required: true })

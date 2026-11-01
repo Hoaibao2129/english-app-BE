@@ -95,6 +95,10 @@ describe('VocabularyController', () => {
       .expect(401);
     await request(http).get('/vocabulary/summary').expect(401);
     await request(http).delete('/vocabulary/progress').expect(401);
+    await request(http).get(`/vocabulary/topics/${topic}/review`).expect(401);
+    await request(http)
+      .delete(`/vocabulary/topics/${topic}/progress`)
+      .expect(401);
     await request(http)
       .get('/vocabulary/topics')
       .set('Authorization', 'Bearer garbage')
@@ -205,5 +209,32 @@ describe('VocabularyController', () => {
     expect(
       await app.get(getModelToken(WordProgress.name)).countDocuments(),
     ).toBe(0);
+  });
+
+  it('review mode is accepted; GET review lists wrong words; DELETE topic progress resets it', async () => {
+    const del = (path: string) =>
+      request(app.getHttpServer())
+        .delete(path)
+        .set('Authorization', `Bearer ${token_a}`);
+    grade.mockResolvedValue({ is_correct: false, graded_by: 'ai' });
+    await post({
+      word_id,
+      direction: 'en_vi',
+      mode: 'review',
+      answer: 'x',
+    }).expect(200);
+    const topic_id = (await get('/vocabulary/topics').expect(200)).body[0].id;
+    const review = await get(`/vocabulary/topics/${topic_id}/review`).expect(
+      200,
+    );
+    expect(review.body.words.map((w: any) => w.status)).toEqual(['wrong']);
+    await get('/vocabulary/topics/abc/review').expect(400);
+    await del('/vocabulary/topics/abc/progress').expect(400);
+    await del(
+      `/vocabulary/topics/${String(new Types.ObjectId())}/progress`,
+    ).expect(404);
+    await del(`/vocabulary/topics/${topic_id}/progress`).expect(204);
+    const after = await get('/vocabulary/topics').expect(200);
+    expect(after.body[0]).toMatchObject({ wrong: 0, status: 'not_started' });
   });
 });

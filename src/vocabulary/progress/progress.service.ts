@@ -80,6 +80,12 @@ export class ProgressService {
     return { ...this.to_summary(topic, counts, dtos.length), words: dtos };
   }
 
+  /** Topic detail restricted to the words whose last answer was wrong. */
+  async get_review(user_id: string, topic_id: string): Promise<TopicDetailDto> {
+    const topic = await this.get_topic(user_id, topic_id);
+    return { ...topic, words: topic.words.filter((w) => w.status === 'wrong') };
+  }
+
   async submit_answer(
     user_id: string,
     input: SubmitAnswerInput,
@@ -157,6 +163,21 @@ export class ProgressService {
     await Promise.all([
       this.progress.deleteMany(owner),
       this.logs.deleteMany(owner),
+    ]);
+  }
+
+  async reset_topic(user_id: string, topic_id: string): Promise<void> {
+    if (!is_object_id_string(topic_id))
+      throw new BadRequestException('Invalid topic id');
+    const topic = await this.topics.exists({ _id: topic_id });
+    if (!topic) throw new NotFoundException('Topic not found');
+    const scope = {
+      user_id: new Types.ObjectId(user_id),
+      topic_id: new Types.ObjectId(topic_id),
+    };
+    await Promise.all([
+      this.progress.deleteMany(scope),
+      this.logs.deleteMany(scope),
     ]);
   }
 
