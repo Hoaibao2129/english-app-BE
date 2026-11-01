@@ -1,5 +1,5 @@
 export type Direction = 'en_vi' | 'vi_en';
-export type StudyMode = 'flashcard' | 'quiz';
+export type StudyMode = 'flashcard' | 'quiz' | 'review';
 export type GradedBy = 'exact' | 'cache' | 'ai' | 'skipped' | 'ungraded';
 
 export interface GradeResult {

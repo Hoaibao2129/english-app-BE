@@ -7,7 +7,7 @@ import type {
 } from '../vocabulary.types.js';
 
 const DIRECTIONS: readonly Direction[] = ['en_vi', 'vi_en'];
-const MODES: readonly StudyMode[] = ['flashcard', 'quiz'];
+const MODES: readonly StudyMode[] = ['flashcard', 'quiz', 'review'];
 export const MAX_ANSWER_LENGTH = 200;
 
 export function is_object_id_string(value: unknown): value is string {

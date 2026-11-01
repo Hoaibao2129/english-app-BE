@@ -42,6 +42,25 @@ export class VocabularyController {
     return this.progress.get_topic(user.user_id, topic_id);
   }
 
+  @Get('topics/:topic_id/review')
+  @ApiOperation({ summary: 'Get a topic with only the words answered wrong' })
+  get_review(
+    @CurrentUser() user: AuthUser,
+    @Param('topic_id') topic_id: string,
+  ): Promise<TopicDetailDto> {
+    return this.progress.get_review(user.user_id, topic_id);
+  }
+
+  @Delete('topics/:topic_id/progress')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Reset progress and answer logs of one topic' })
+  async reset_topic(
+    @CurrentUser() user: AuthUser,
+    @Param('topic_id') topic_id: string,
+  ): Promise<void> {
+    await this.progress.reset_topic(user.user_id, topic_id);
+  }
+
   @Post('answers')
   @HttpCode(200)
   @ApiOperation({ summary: 'Submit an answer, grade it and record progress' })

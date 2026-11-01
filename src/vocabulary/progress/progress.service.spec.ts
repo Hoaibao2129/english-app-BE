@@ -302,4 +302,62 @@ describe('ProgressService', () => {
     await answer('day', 'en_vi', user_b);
     expect(await progress.countDocuments()).toBe(2);
   });
+
+  it('get_review returns only wrong words of the topic', async () => {
+    grade.mockResolvedValueOnce({ is_correct: true, graded_by: 'exact' });
+    grade.mockResolvedValueOnce({ is_correct: false, graded_by: 'ai' });
+    await answer('day');
+    await answer('week');
+    const t = (await service.list_topics(user_a))[0];
+    const r = await service.get_review(user_a, t.id);
+    expect(r.words.map((w) => w.word)).toEqual(['week']);
+    expect([r.total_words, r.correct, r.wrong]).toEqual([2, 1, 1]);
+  });
+
+  it('a correct answer in review mode moves the word from wrong to correct', async () => {
+    grade.mockResolvedValueOnce({ is_correct: false, graded_by: 'ai' });
+    grade.mockResolvedValueOnce({ is_correct: true, graded_by: 'exact' });
+    await answer('rice');
+    await service.submit_answer(user_a, {
+      word_id: await word_id('rice'),
+      direction: 'en_vi',
+      mode: 'review',
+      answer: 'cơm',
+    });
+    const t = (await service.list_topics(user_a))[1];
+    expect([t.correct, t.wrong, t.status]).toEqual([1, 0, 'completed']);
+    expect((await service.get_review(user_a, t.id)).words).toEqual([]);
+    expect((await logs.findOne({ mode: 'review' }).lean())?.is_correct).toBe(
+      true,
+    );
+  });
+
+  it('reset_topic clears only that topic for that user', async () => {
+    grade.mockResolvedValue({ is_correct: true, graded_by: 'exact' });
+    await answer('day');
+    await answer('rice');
+    await answer('day', 'en_vi', user_b);
+    const [time] = await service.list_topics(user_a);
+    await service.reset_topic(user_a, time.id);
+    const [time_after, food_after] = await service.list_topics(user_a);
+    expect(time_after.status).toBe('not_started');
+    expect(food_after.correct).toBe(1);
+    expect(
+      await logs.countDocuments({ user_id: new Types.ObjectId(user_a) }),
+    ).toBe(1);
+    expect((await service.list_topics(user_b))[0].correct).toBe(1);
+  });
+
+  it('reset_topic and get_review throw 400 for invalid id and 404 for missing', async () => {
+    const missing = String(new Types.ObjectId());
+    await expect(service.reset_topic(user_a, 'abc')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    await expect(service.reset_topic(user_a, missing)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(service.get_review(user_a, missing)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
 });
