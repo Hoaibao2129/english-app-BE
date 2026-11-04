@@ -19,7 +19,7 @@ import type {
   TopicSummaryDto,
   WordDto,
 } from '../vocabulary.types.js';
-import { is_object_id_string } from './submit-answer.parse.js';
+import { is_object_id_string } from '../../common/input.parse.js';
 
 interface Counts {
   correct: number;

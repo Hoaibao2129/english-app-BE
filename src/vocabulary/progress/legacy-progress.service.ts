@@ -1,13 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { AnswerLog } from '../vocabulary/schemas/answer-log.schema.js';
-import { WordProgress } from '../vocabulary/schemas/word-progress.schema.js';
+import { AnswerLog } from '../schemas/answer-log.schema.js';
+import { WordProgress } from '../schemas/word-progress.schema.js';
 
-/**
- * Lives in AuthModule (not ProgressService) so AuthModule never has to import
- * VocabularyModule, which already imports AuthModule for the guard.
- */
 @Injectable()
 export class LegacyProgressService {
   constructor(

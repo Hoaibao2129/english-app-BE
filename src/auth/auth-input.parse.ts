@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { as_object } from '../common/input.parse.js';
 import type { LoginInput, RegisterInput } from './auth.types.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -6,13 +7,6 @@ const MAX_EMAIL_LENGTH = 254;
 const MIN_PASSWORD_BYTES = 8;
 const MAX_PASSWORD_BYTES = 72;
 const MAX_DISPLAY_NAME_LENGTH = 50;
-
-function as_object(body: unknown): Record<string, unknown> {
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
-    throw new BadRequestException('Request body must be a JSON object');
-  }
-  return body as Record<string, unknown>;
-}
 
 function parse_credentials(body: Record<string, unknown>): LoginInput {
   const { email, password } = body;

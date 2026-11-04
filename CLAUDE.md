@@ -30,6 +30,10 @@ npm run test:e2e -- -t "/ (GET)"
 
 Jest is invoked through `node --experimental-vm-modules` because the code is ESM; don't call `npx jest` directly.
 
+## Coding rules
+
+Conventions and patterns live in `ai-rules/*.md`, the IDE-agnostic source of truth (naming, module structure, controller, validation, service, schema, testing, config/security, git). Read them before writing code; when a rule conflicts with existing code, ask instead of guessing. Edit rules only in `ai-rules/`; `npm run rules:generate -- <claude|cursor|copilot|windsurf|agents|gemini|all>` generates the per-IDE copies (gitignored).
+
 ## Architecture & conventions
 
 - **ESM import paths**: relative imports must use the `.js` extension (e.g. `import { AppService } from './app.service.js'`), as required by `module: nodenext`. Jest's `moduleNameMapper` strips `.js` so ts-jest resolves the `.ts` source.
