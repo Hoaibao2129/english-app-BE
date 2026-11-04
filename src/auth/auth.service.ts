@@ -4,7 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
-import { LegacyProgressService } from './legacy-progress.service.js';
+import { LegacyProgressService } from '../vocabulary/progress/legacy-progress.service.js';
 import { RefreshTokenService } from './refresh-token.service.js';
 import { TokenService } from './token.service.js';
 import { UsersService } from './users.service.js';
