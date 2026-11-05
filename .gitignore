@@ -19,3 +19,11 @@ npm-debug.log*
 .idea/
 .vscode/
 *.tsbuildinfo
+
+# AI rules generated from ai-rules/ (npm run rules:generate)
+.claude/rules/
+.cursor/rules/
+.github/instructions/
+.windsurf/rules/
+AGENTS.md
+GEMINI.md
