@@ -27,3 +27,7 @@ npm-debug.log*
 .windsurf/rules/
 AGENTS.md
 GEMINI.md
+.claude/commands/
+.cursor/commands/
+.agents/skills/agent-assistant/
+.agents/skills/speckit-implement/
