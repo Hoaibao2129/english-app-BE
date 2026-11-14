@@ -148,11 +148,13 @@ describe('VocabularyController', () => {
   });
 
   it('GET /vocabulary/topics/abc → 400', async () => {
-    await get('/vocabulary/topics/abc').expect(400);
+    await get('/vocabulary/topics/abc?direction=en_vi').expect(400);
   });
 
   it('GET topic unknown id → 404', async () => {
-    await get(`/vocabulary/topics/${String(new Types.ObjectId())}`).expect(404);
+    await get(
+      `/vocabulary/topics/${String(new Types.ObjectId())}?direction=en_vi`,
+    ).expect(404);
   });
 
   it('happy path POST returns {is_correct, correct_answer, graded_by} and GETs reflect it', async () => {
@@ -168,18 +170,19 @@ describe('VocabularyController', () => {
       correct_answer: 'ngày',
       graded_by: 'exact',
     });
-    const topics = await get('/vocabulary/topics').expect(200);
+    const topics = await get('/vocabulary/topics?direction=en_vi').expect(200);
     expect(topics.body[0]).toMatchObject({ correct: 1, status: 'completed' });
-    const detail = await get(`/vocabulary/topics/${topics.body[0].id}`).expect(
-      200,
-    );
+    const detail = await get(
+      `/vocabulary/topics/${topics.body[0].id}?direction=en_vi`,
+    ).expect(200);
     expect(detail.body.words[0].status).toBe('correct');
-    const sum = await get('/vocabulary/summary').expect(200);
+    const sum = await get('/vocabulary/summary?direction=en_vi').expect(200);
     expect(sum.body).toEqual({
       total_words: 1,
       learned_words: 1,
       wrong_words: 0,
       not_started: 0,
+      direction: 'en_vi',
     });
   });
 
@@ -191,13 +194,15 @@ describe('VocabularyController', () => {
       mode: 'quiz',
       answer: 'x',
     }).expect(200);
-    const b = await get('/vocabulary/topics', token_b).expect(200);
+    const b = await get('/vocabulary/topics?direction=en_vi', token_b).expect(
+      200,
+    );
     expect(b.body[0]).toMatchObject({ correct: 0, wrong: 0 });
     await request(app.getHttpServer())
       .delete('/vocabulary/progress')
       .set('Authorization', `Bearer ${token_b}`)
       .expect(204);
-    const a = await get('/vocabulary/topics').expect(200);
+    const a = await get('/vocabulary/topics?direction=en_vi').expect(200);
     expect(a.body[0]).toMatchObject({ correct: 1 });
   });
 
@@ -223,18 +228,124 @@ describe('VocabularyController', () => {
       mode: 'review',
       answer: 'x',
     }).expect(200);
-    const topic_id = (await get('/vocabulary/topics').expect(200)).body[0].id;
-    const review = await get(`/vocabulary/topics/${topic_id}/review`).expect(
-      200,
-    );
+    const topic_id = (
+      await get('/vocabulary/topics?direction=en_vi').expect(200)
+    ).body[0].id;
+    const review = await get(
+      `/vocabulary/topics/${topic_id}/review?direction=en_vi`,
+    ).expect(200);
     expect(review.body.words.map((w: any) => w.status)).toEqual(['wrong']);
-    await get('/vocabulary/topics/abc/review').expect(400);
+    await get('/vocabulary/topics/abc/review?direction=en_vi').expect(400);
     await del('/vocabulary/topics/abc/progress').expect(400);
     await del(
       `/vocabulary/topics/${String(new Types.ObjectId())}/progress`,
     ).expect(404);
     await del(`/vocabulary/topics/${topic_id}/progress`).expect(204);
-    const after = await get('/vocabulary/topics').expect(200);
+    const after = await get('/vocabulary/topics?direction=en_vi').expect(200);
     expect(after.body[0]).toMatchObject({ wrong: 0, status: 'not_started' });
+  });
+
+  it('read routes reject a missing, empty, unknown or repeated direction → 400', async () => {
+    const topic = String(new Types.ObjectId());
+    const paths = [
+      '/vocabulary/topics',
+      `/vocabulary/topics/${topic}`,
+      `/vocabulary/topics/${topic}/review`,
+      '/vocabulary/summary',
+    ];
+    for (const path of paths) {
+      for (const query of [
+        '',
+        '?direction=',
+        '?direction=foo',
+        '?direction=en_vi&direction=vi_en',
+      ]) {
+        const res = await get(`${path}${query}`).expect(400);
+        expect(res.body.message).toBe('direction must be one of: en_vi, vi_en');
+      }
+    }
+  });
+
+  it('read routes return the progress of the selected direction only', async () => {
+    const http = app.getHttpServer();
+    await request(http)
+      .delete('/vocabulary/progress')
+      .set('Authorization', `Bearer ${token_a}`)
+      .expect(204);
+    grade.mockResolvedValue({ is_correct: true, graded_by: 'exact' });
+    await post({
+      word_id,
+      direction: 'en_vi',
+      mode: 'quiz',
+      answer: 'ngày',
+    }).expect(200);
+    const en_vi = await get('/vocabulary/topics?direction=en_vi').expect(200);
+    expect(en_vi.body[0]).toMatchObject({
+      correct: 1,
+      status: 'completed',
+      direction: 'en_vi',
+    });
+    const vi_en = await get('/vocabulary/topics?direction=vi_en').expect(200);
+    expect(vi_en.body[0]).toMatchObject({
+      correct: 0,
+      status: 'not_started',
+      direction: 'vi_en',
+    });
+    const detail = await get(
+      `/vocabulary/topics/${vi_en.body[0].id}?direction=vi_en`,
+    ).expect(200);
+    expect(detail.body.direction).toBe('vi_en');
+    expect(detail.body.words[0].status).toBe('new');
+    const sum = await get('/vocabulary/summary?direction=vi_en').expect(200);
+    expect(sum.body).toMatchObject({ learned_words: 0, direction: 'vi_en' });
+  });
+
+  it('DELETE progress with a direction resets only that direction; bad direction → 400', async () => {
+    const http = app.getHttpServer();
+    const del = (path: string, token: string = token_a) =>
+      request(http).delete(path).set('Authorization', `Bearer ${token}`);
+    const progress = app.get(getModelToken(WordProgress.name));
+    await del('/vocabulary/progress').expect(204);
+    grade.mockResolvedValue({ is_correct: true, graded_by: 'exact' });
+    for (const direction of ['en_vi', 'vi_en']) {
+      await post({ word_id, direction, mode: 'quiz', answer: 'x' }).expect(200);
+    }
+    await del('/vocabulary/progress?direction=foo').expect(400);
+    await del('/vocabulary/progress?direction=').expect(400);
+    await del('/vocabulary/progress?direction=en_vi', token_b).expect(204);
+    expect(await progress.countDocuments()).toBe(2);
+    await del('/vocabulary/progress?direction=en_vi').expect(204);
+    expect((await progress.find().lean()).map((p: any) => p.direction)).toEqual(
+      ['vi_en'],
+    );
+    await del('/vocabulary/progress').expect(204);
+    expect(await progress.countDocuments()).toBe(0);
+  });
+
+  it('DELETE topic progress with a direction resets only that direction', async () => {
+    const del = (path: string) =>
+      request(app.getHttpServer())
+        .delete(path)
+        .set('Authorization', `Bearer ${token_a}`);
+    grade.mockResolvedValue({ is_correct: false, graded_by: 'ai' });
+    for (const direction of ['en_vi', 'vi_en']) {
+      await post({ word_id, direction, mode: 'quiz', answer: 'x' }).expect(200);
+    }
+    const topic_id = (await get('/vocabulary/topics?direction=en_vi')).body[0]
+      .id;
+    await del(`/vocabulary/topics/${topic_id}/progress?direction=foo`).expect(
+      400,
+    );
+    await del('/vocabulary/topics/abc/progress?direction=vi_en').expect(400);
+    await del(
+      `/vocabulary/topics/${String(new Types.ObjectId())}/progress?direction=vi_en`,
+    ).expect(404);
+    await del(`/vocabulary/topics/${topic_id}/progress?direction=vi_en`).expect(
+      204,
+    );
+    const vi_en = await get('/vocabulary/topics?direction=vi_en');
+    expect(vi_en.body[0]).toMatchObject({ wrong: 0, status: 'not_started' });
+    const en_vi = await get('/vocabulary/topics?direction=en_vi');
+    expect(en_vi.body[0]).toMatchObject({ wrong: 1 });
   });
 });

@@ -5,6 +5,13 @@ import {
 } from './env.validation.js';
 
 const JWT_SECRET = 'x'.repeat(32);
+const SMTP = {
+  SMTP_HOST: 'smtp.gmail.com',
+  SMTP_PORT: '465',
+  SMTP_USER: 'me@gmail.com',
+  SMTP_PASS: 'app-password',
+  SMTP_FROM: 'Study English <me@gmail.com>',
+};
 
 describe('validate_environment', () => {
   describe('GROQ_API_KEY', () => {
@@ -115,6 +122,7 @@ describe('validate_environment', () => {
     it('parses a comma-separated list, trimming spaces and a trailing slash', () => {
       const result = validate_environment({
         ...base,
+        ...SMTP,
         NODE_ENV: 'production',
         CORS_ORIGINS:
           ' https://study-english.vercel.app/ , http://localhost:5173,',
@@ -134,6 +142,49 @@ describe('validate_environment', () => {
         expect(() =>
           validate_environment({ ...base, CORS_ORIGINS: bad }),
         ).toThrow('CORS_ORIGINS');
+      }
+    });
+  });
+
+  describe('SMTP', () => {
+    const base = { MONGODB_URI: 'mongodb://x', JWT_SECRET };
+    const production = {
+      ...base,
+      NODE_ENV: 'production',
+      CORS_ORIGINS: 'https://a.com',
+    };
+
+    it('allows blank SMTP settings outside production', () => {
+      const result = validate_environment(base);
+      expect(result.SMTP_HOST).toBeUndefined();
+      expect(result.SMTP_PORT).toBeUndefined();
+      expect(result.SMTP_PASS).toBeUndefined();
+    });
+
+    it('parses valid SMTP settings', () => {
+      const result = validate_environment({ ...production, ...SMTP });
+      expect(result.SMTP_HOST).toBe('smtp.gmail.com');
+      expect(result.SMTP_PORT).toBe(465);
+      expect(result.SMTP_USER).toBe('me@gmail.com');
+      expect(result.SMTP_PASS).toBe('app-password');
+      expect(result.SMTP_FROM).toBe('Study English <me@gmail.com>');
+    });
+
+    it('requires every SMTP setting in production', () => {
+      for (const name of Object.keys(SMTP)) {
+        const partial: Record<string, unknown> = { ...production, ...SMTP };
+        delete partial[name];
+        expect(() => validate_environment(partial)).toThrow(
+          `${name} is required in production`,
+        );
+      }
+    });
+
+    it('rejects an invalid SMTP_PORT', () => {
+      for (const bad of ['abc', '0', '70000', '1.5']) {
+        expect(() => validate_environment({ ...base, SMTP_PORT: bad })).toThrow(
+          'SMTP_PORT must be an integer between 1 and 65535',
+        );
       }
     });
   });

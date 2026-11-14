@@ -8,6 +8,7 @@ import {
   start_mongo,
 } from '../test-utils/mongo-memory.js';
 import { AuthModule } from './auth.module.js';
+import { MailService } from '../mail/mail.service.js';
 
 const SECRET = 'x'.repeat(32);
 
@@ -170,5 +171,74 @@ describe('AuthController', () => {
   it('refresh/logout with non-string refresh_token -> 400', async () => {
     await post('/auth/refresh', { refresh_token: 5 }).expect(400);
     await post('/auth/logout', {}).expect(400);
+  });
+
+  describe('forgot password routes', () => {
+    let last_text = '';
+
+    beforeAll(() => {
+      app.get(MailService, { strict: false }).transport = {
+        sendMail: (message) => {
+          last_text = message.text;
+          return Promise.resolve({});
+        },
+      };
+    });
+
+    it('POST /auth/forgot-password 404 for an unknown email, 400 for a bad one', async () => {
+      const res = await post('/auth/forgot-password', {
+        email: 'nobody@example.com',
+      }).expect(404);
+      expect(res.body.message).toBe('Email is not registered');
+      await post('/auth/forgot-password', { email: 'bad' }).expect(400);
+    });
+
+    it('runs the full flow without authentication and requires a new login', async () => {
+      const sent = await post('/auth/forgot-password', {
+        email: 'me@example.com',
+      }).expect(200);
+      expect(sent.body).toEqual({
+        message: 'OTP sent',
+        expires_in_seconds: 300,
+      });
+      const otp = /\d{6}/.exec(last_text)![0];
+
+      await post('/auth/forgot-password/verify', {
+        email: 'me@example.com',
+        otp: '12',
+      }).expect(400);
+      const verified = await post('/auth/forgot-password/verify', {
+        email: 'me@example.com',
+        otp,
+      }).expect(200);
+      expect(verified.body.expires_in_seconds).toBe(300);
+
+      const mismatch = await post('/auth/reset-password', {
+        reset_token: verified.body.reset_token,
+        new_password: 'newpassword1',
+        confirm_password: 'other-password',
+      }).expect(400);
+      expect(mismatch.body.reset_token).toEqual(expect.any(String));
+
+      await post('/auth/reset-password', {
+        reset_token: mismatch.body.reset_token,
+        new_password: 'newpassword1',
+        confirm_password: 'newpassword1',
+      }).expect(200, { message: 'Password reset successfully' });
+
+      await post('/auth/reset-password', {
+        reset_token: mismatch.body.reset_token,
+        new_password: 'newpassword1',
+        confirm_password: 'newpassword1',
+      }).expect(401);
+      await post('/auth/login', {
+        email: 'me@example.com',
+        password: 'password1',
+      }).expect(401);
+      await post('/auth/login', {
+        email: 'me@example.com',
+        password: 'newpassword1',
+      }).expect(200);
+    });
   });
 });

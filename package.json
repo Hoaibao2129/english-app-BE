@@ -27,7 +27,8 @@
     "test:cov": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage",
     "test:debug": "node --experimental-vm-modules --inspect-brk ./node_modules/jest/bin/jest.js --runInBand",
     "test:e2e": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-e2e.config.js",
-    "migrate:drop-version-key": "nest build && node dist/scripts/migrate-drop-version-key.js"
+    "migrate:drop-version-key": "nest build && node dist/scripts/migrate-drop-version-key.js",
+    "migrate:progress-direction": "nest build && node dist/scripts/migrate-progress-direction.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
@@ -39,6 +40,7 @@
     "@nestjs/swagger": "^12.0.2",
     "bcryptjs": "^3.0.3",
     "mongoose": "^9.11.2",
+    "nodemailer": "^10.3.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
@@ -50,6 +52,7 @@
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/supertest": "^7.0.0",
     "jest": "^30.5.2",
     "mongodb-memory-server": "^11.3.0",

@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
+import type { Direction } from '../vocabulary.types.js';
 
 @Schema({
   collection: 'wordprogresses',
@@ -16,6 +17,9 @@ export class WordProgress {
   @Prop({ type: Types.ObjectId, ref: 'Topic', required: true })
   topic_id: Types.ObjectId;
 
+  @Prop({ type: String, enum: ['en_vi', 'vi_en'], required: true })
+  direction: Direction;
+
   @Prop({ type: String, enum: ['correct', 'wrong'], required: true })
   last_result: 'correct' | 'wrong';
 
@@ -31,5 +35,13 @@ export class WordProgress {
 
 export type WordProgressDocument = HydratedDocument<WordProgress>;
 export const WordProgressSchema = SchemaFactory.createForClass(WordProgress);
-WordProgressSchema.index({ user_id: 1, word_id: 1 }, { unique: true });
-WordProgressSchema.index({ user_id: 1, topic_id: 1, last_result: 1 });
+WordProgressSchema.index(
+  { user_id: 1, word_id: 1, direction: 1 },
+  { unique: true },
+);
+WordProgressSchema.index({
+  user_id: 1,
+  direction: 1,
+  topic_id: 1,
+  last_result: 1,
+});

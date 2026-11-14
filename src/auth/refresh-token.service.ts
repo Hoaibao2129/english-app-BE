@@ -102,4 +102,11 @@ export class RefreshTokenService {
       { $set: { revoked_at: this.now() } },
     );
   }
+
+  async revoke_all_for_user(user_id: string): Promise<void> {
+    await this.model.updateMany(
+      { user_id: new Types.ObjectId(user_id), revoked_at: null },
+      { $set: { revoked_at: this.now() } },
+    );
+  }
 }
