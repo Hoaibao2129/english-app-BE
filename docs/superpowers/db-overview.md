@@ -1,6 +1,6 @@
 # Tổng quan cấu trúc và quan hệ DB (MongoDB)
 
-> Cập nhật: 2026-11-08. Nguồn: các file `*.schema.ts` trong `src/auth/schemas/` và `src/vocabulary/schemas/`.
+> Cập nhật: 2026-11-14. Nguồn: các file `*.schema.ts` trong `src/auth/schemas/` và `src/vocabulary/schemas/`.
 > MongoDB không ép khóa ngoại: quan hệ dưới đây là quan hệ logic qua `ObjectId` (`ref`), do code đảm bảo toàn vẹn.
 > Quy ước chung: `versionKey: false`; `created_at`/`updated_at` do Mongoose tự thêm (`timestamps`) với mọi collection, trừ khi ghi chú khác.
 
@@ -59,6 +59,7 @@ erDiagram
         ObjectId user_id FK
         ObjectId word_id FK
         ObjectId topic_id FK
+        string direction
         string last_result
         date last_answered_at
         number correct_count
@@ -145,17 +146,18 @@ Index: `email` (unique); `password_reset.reset_token_hash` (sparse).
 Index: `{ topic_id, order }`; `key` (unique).
 
 ### 2.5 `wordprogresses` (module `vocabulary`)
-Tiến độ **hiện tại** của một user với một từ (một document cho mỗi cặp user + từ).
+Tiến độ **hiện tại** của một user với một từ theo từng chiều học (một document cho mỗi bộ user + từ + chiều, tối đa 2 document cho một từ).
 | Field | Kiểu | Ghi chú |
 |---|---|---|
 | `user_id` | ObjectId | ref `User` |
 | `word_id` | ObjectId | ref `Word` |
 | `topic_id` | ObjectId | ref `Topic` (lưu lặp để query theo chủ đề) |
+| `direction` | `'en_vi'` \| `'vi_en'` | chiều học, bắt buộc |
 | `last_result` | `'correct'` \| `'wrong'` | kết quả lần trả lời gần nhất |
 | `last_answered_at` | Date | |
 | `correct_count`, `wrong_count` | number | mặc định 0 |
 
-Index: `{ user_id, word_id }` **unique**; `{ user_id, topic_id, last_result }`.
+Index: `{ user_id, word_id, direction }` **unique**; `{ user_id, direction, topic_id, last_result }`.
 
 ### 2.6 `answerlogs` (module `vocabulary`)
 Nhật ký **từng lần** trả lời (chỉ thêm, dùng cho lịch sử).
@@ -189,7 +191,7 @@ Index: `{ word_id, direction, normalized_answer }` **unique**.
 |---|---|---|---|---|
 | `refresh_tokens` | `user_id` | `users` | N-1 | không khai `ref`; xoá theo TTL |
 | `words` | `topic_id` | `topics` | N-1 | |
-| `wordprogresses` | `user_id` | `users` | N-1 | cặp `(user_id, word_id)` unique |
+| `wordprogresses` | `user_id` | `users` | N-1 | bộ ba `(user_id, word_id, direction)` unique |
 | `wordprogresses` | `word_id` | `words` | N-1 | |
 | `wordprogresses` | `topic_id` | `topics` | N-1 | dữ liệu lặp từ `words.topic_id` |
 | `answerlogs` | `user_id`, `word_id`, `topic_id` | `users`, `words`, `topics` | N-1 mỗi cái | |
@@ -202,4 +204,4 @@ Index: `{ word_id, direction, normalized_answer }` **unique**.
 - **Tên collection chưa đồng nhất rule:** `refresh_tokens` có dấu gạch dưới, trong khi rule yêu cầu viết liền không dấu (ví dụ `refreshtokens`). Đổi tên cần migration, chưa thực hiện.
 - Dữ liệu `password_reset` hết hạn không tự bị xoá (không có TTL vì nằm trong document `users`); chỉ chứa hash và bị ghi đè khi xin OTP mới hoặc xoá khi đổi mật khẩu thành công.
 - Collection `users` đã có trước khi thêm `password_reset`: user cũ chưa có field này, được coi như `null`, không cần migration.
-
+- `wordprogresses` trước khi tách chiều học chưa có `direction`: migration `npm run migrate:progress-direction -- --confirm` dựng lại từng chiều từ `answerlogs` (log đã chấm), dòng không có log đã chấm gán `en_vi`, đồng thời gỡ index cũ `user_id_1_word_id_1` và `user_id_1_topic_id_1_last_result_1`.

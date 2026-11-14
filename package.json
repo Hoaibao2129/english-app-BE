@@ -27,7 +27,8 @@
     "test:cov": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage",
     "test:debug": "node --experimental-vm-modules --inspect-brk ./node_modules/jest/bin/jest.js --runInBand",
     "test:e2e": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-e2e.config.js",
-    "migrate:drop-version-key": "nest build && node dist/scripts/migrate-drop-version-key.js"
+    "migrate:drop-version-key": "nest build && node dist/scripts/migrate-drop-version-key.js",
+    "migrate:progress-direction": "nest build && node dist/scripts/migrate-progress-direction.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

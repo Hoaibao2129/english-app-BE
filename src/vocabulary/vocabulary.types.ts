@@ -19,6 +19,7 @@ export interface TopicSummaryDto {
   wrong: number;
   not_started: number;
   status: TopicStatus;
+  direction: Direction;
 }
 
 export interface WordDto {
@@ -52,4 +53,5 @@ export interface SummaryDto {
   learned_words: number;
   wrong_words: number;
   not_started: number;
+  direction: Direction;
 }

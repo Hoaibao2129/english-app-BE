@@ -164,6 +164,7 @@ describe('SeedService', () => {
       user_id: new Types.ObjectId(),
       word_id: a!._id,
       topic_id: a!.topic_id,
+      direction: 'en_vi',
       last_result: 'correct',
       last_answered_at: new Date(),
       correct_count: 1,
