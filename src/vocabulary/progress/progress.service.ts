@@ -11,6 +11,7 @@ import { Topic } from '../schemas/topic.schema.js';
 import { WordProgress } from '../schemas/word-progress.schema.js';
 import { Word } from '../schemas/word.schema.js';
 import type {
+  Direction,
   SubmitAnswerInput,
   SubmitAnswerResult,
   SummaryDto,
@@ -37,17 +38,28 @@ export class ProgressService {
     private readonly grader: AnswerGrader,
   ) {}
 
-  async list_topics(user_id: string): Promise<TopicSummaryDto[]> {
+  async list_topics(
+    user_id: string,
+    direction: Direction,
+  ): Promise<TopicSummaryDto[]> {
     const [topics, counts] = await Promise.all([
       this.topics.find().sort({ order: 1 }).lean(),
-      this.counts_by_topic(user_id),
+      this.counts_by_topic(user_id, direction),
     ]);
     return topics.map((t) =>
-      this.to_summary(t, counts.get(String(t._id)) ?? { correct: 0, wrong: 0 }),
+      this.to_summary(
+        t,
+        counts.get(String(t._id)) ?? { correct: 0, wrong: 0 },
+        direction,
+      ),
     );
   }
 
-  async get_topic(user_id: string, topic_id: string): Promise<TopicDetailDto> {
+  async get_topic(
+    user_id: string,
+    topic_id: string,
+    direction: Direction,
+  ): Promise<TopicDetailDto> {
     if (!is_object_id_string(topic_id))
       throw new BadRequestException('Invalid topic id');
     const topic = await this.topics.findById(topic_id).lean();
@@ -56,7 +68,11 @@ export class ProgressService {
     const [words, progress] = await Promise.all([
       this.words.find({ topic_id: topic._id }).sort({ order: 1 }).lean(),
       this.progress
-        .find({ user_id: new Types.ObjectId(user_id), topic_id: topic._id })
+        .find({
+          user_id: new Types.ObjectId(user_id),
+          topic_id: topic._id,
+          direction,
+        })
         .lean(),
     ]);
     const last = new Map(
@@ -77,12 +93,19 @@ export class ProgressService {
       if (w.status === 'correct') counts.correct++;
       else if (w.status === 'wrong') counts.wrong++;
     }
-    return { ...this.to_summary(topic, counts, dtos.length), words: dtos };
+    return {
+      ...this.to_summary(topic, counts, direction, dtos.length),
+      words: dtos,
+    };
   }
 
   /** Topic detail restricted to the words whose last answer was wrong. */
-  async get_review(user_id: string, topic_id: string): Promise<TopicDetailDto> {
-    const topic = await this.get_topic(user_id, topic_id);
+  async get_review(
+    user_id: string,
+    topic_id: string,
+    direction: Direction,
+  ): Promise<TopicDetailDto> {
+    const topic = await this.get_topic(user_id, topic_id, direction);
     return { ...topic, words: topic.words.filter((w) => w.status === 'wrong') };
   }
 
@@ -118,7 +141,7 @@ export class ProgressService {
 
     if (result.is_correct !== null) {
       await this.progress.updateOne(
-        { user_id: owner, word_id: word._id },
+        { user_id: owner, word_id: word._id, direction: input.direction },
         {
           $set: {
             last_result: result.is_correct ? 'correct' : 'wrong',
@@ -138,10 +161,10 @@ export class ProgressService {
     };
   }
 
-  async summary(user_id: string): Promise<SummaryDto> {
+  async summary(user_id: string, direction: Direction): Promise<SummaryDto> {
     const [topics, counts] = await Promise.all([
       this.topics.find().lean(),
-      this.counts_by_topic(user_id),
+      this.counts_by_topic(user_id, direction),
     ]);
     const total_words = topics.reduce((n, t) => n + t.word_count, 0);
     let learned_words = 0;
@@ -155,18 +178,28 @@ export class ProgressService {
       learned_words,
       wrong_words,
       not_started: total_words - learned_words - wrong_words,
+      direction,
     };
   }
 
-  async reset(user_id: string): Promise<void> {
-    const owner = { user_id: new Types.ObjectId(user_id) };
+  /** A null direction resets both directions. */
+  async reset(user_id: string, direction: Direction | null): Promise<void> {
+    const owner = {
+      user_id: new Types.ObjectId(user_id),
+      ...(direction ? { direction } : {}),
+    };
     await Promise.all([
       this.progress.deleteMany(owner),
       this.logs.deleteMany(owner),
     ]);
   }
 
-  async reset_topic(user_id: string, topic_id: string): Promise<void> {
+  /** A null direction resets both directions of the topic. */
+  async reset_topic(
+    user_id: string,
+    topic_id: string,
+    direction: Direction | null,
+  ): Promise<void> {
     if (!is_object_id_string(topic_id))
       throw new BadRequestException('Invalid topic id');
     const topic = await this.topics.exists({ _id: topic_id });
@@ -174,6 +207,7 @@ export class ProgressService {
     const scope = {
       user_id: new Types.ObjectId(user_id),
       topic_id: new Types.ObjectId(topic_id),
+      ...(direction ? { direction } : {}),
     };
     await Promise.all([
       this.progress.deleteMany(scope),
@@ -181,12 +215,15 @@ export class ProgressService {
     ]);
   }
 
-  private async counts_by_topic(user_id: string): Promise<Map<string, Counts>> {
+  private async counts_by_topic(
+    user_id: string,
+    direction: Direction,
+  ): Promise<Map<string, Counts>> {
     const rows = await this.progress.aggregate<{
       _id: { topic_id: Types.ObjectId; last_result: 'correct' | 'wrong' };
       n: number;
     }>([
-      { $match: { user_id: new Types.ObjectId(user_id) } },
+      { $match: { user_id: new Types.ObjectId(user_id), direction } },
       {
         $group: {
           _id: { topic_id: '$topic_id', last_result: '$last_result' },
@@ -213,6 +250,7 @@ export class ProgressService {
       word_count: number;
     },
     c: Counts,
+    direction: Direction,
     total_words: number = t.word_count,
   ): TopicSummaryDto {
     let status: TopicStatus = 'in_progress';
@@ -228,6 +266,7 @@ export class ProgressService {
       wrong: c.wrong,
       not_started: total_words - c.correct - c.wrong,
       status,
+      direction,
     };
   }
 }

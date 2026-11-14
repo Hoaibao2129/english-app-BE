@@ -144,4 +144,23 @@ describe('RefreshTokenService', () => {
       UnauthorizedException,
     );
   });
+
+  it('revoke_all_for_user revokes only that user tokens', async () => {
+    const other_user_id = new Types.ObjectId().toString();
+    const mine_1 = await service.create_refresh_token(user_id);
+    const mine_2 = await service.create_refresh_token(user_id);
+    const theirs = await service.create_refresh_token(other_user_id);
+
+    await service.revoke_all_for_user(user_id);
+
+    await expect(service.rotate(mine_1)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    await expect(service.rotate(mine_2)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    await expect(service.rotate(theirs)).resolves.toEqual(
+      expect.objectContaining({ user_id: other_user_id }),
+    );
+  });
 });

@@ -10,6 +10,11 @@ interface Environment {
   JWT_ACCESS_TTL: string;
   JWT_REFRESH_TTL: string;
   CORS_ORIGINS: string[] | null;
+  SMTP_HOST?: string;
+  SMTP_PORT?: number;
+  SMTP_USER?: string;
+  SMTP_PASS?: string;
+  SMTP_FROM?: string;
 }
 
 const DURATION_PATTERN = /^(\d+)([smhd])$/;
@@ -59,6 +64,67 @@ function read_ttl(
     throw new Error(`${name} must match <number><s|m|h|d>, e.g. 15m`);
   }
   return value;
+}
+
+interface SmtpEnvironment {
+  SMTP_HOST?: string;
+  SMTP_PORT?: number;
+  SMTP_USER?: string;
+  SMTP_PASS?: string;
+  SMTP_FROM?: string;
+}
+
+function read_optional_string(
+  environment: Record<string, unknown>,
+  name: string,
+): string | undefined {
+  const value = environment[name];
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/** SMTP settings are required in production and optional elsewhere. */
+function read_smtp(
+  environment: Record<string, unknown>,
+  node_env: string,
+): SmtpEnvironment {
+  const host = read_optional_string(environment, 'SMTP_HOST');
+  const raw_port = read_optional_string(environment, 'SMTP_PORT');
+  const user = read_optional_string(environment, 'SMTP_USER');
+  const pass = environment.SMTP_PASS;
+  const password =
+    typeof pass === 'string' && pass.length > 0 ? pass : undefined;
+  const from = read_optional_string(environment, 'SMTP_FROM');
+
+  if (node_env === 'production') {
+    for (const [name, value] of [
+      ['SMTP_HOST', host],
+      ['SMTP_PORT', raw_port],
+      ['SMTP_USER', user],
+      ['SMTP_PASS', password],
+      ['SMTP_FROM', from],
+    ] as const) {
+      if (value === undefined) {
+        throw new Error(`${name} is required in production`);
+      }
+    }
+  }
+
+  let port: number | undefined;
+  if (raw_port !== undefined) {
+    port = Number(raw_port);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error('SMTP_PORT must be an integer between 1 and 65535');
+    }
+  }
+  return {
+    SMTP_HOST: host,
+    SMTP_PORT: port,
+    SMTP_USER: user,
+    SMTP_PASS: password,
+    SMTP_FROM: from,
+  };
 }
 
 export function validate_environment(
@@ -111,6 +177,7 @@ export function validate_environment(
   const jwt_access_ttl = read_ttl(environment, 'JWT_ACCESS_TTL', '15m');
   const jwt_refresh_ttl = read_ttl(environment, 'JWT_REFRESH_TTL', '1d');
   const cors_origins = read_cors_origins(environment, node_env);
+  const smtp = read_smtp(environment, node_env);
 
   return {
     ...environment,
@@ -123,5 +190,6 @@ export function validate_environment(
     JWT_ACCESS_TTL: jwt_access_ttl,
     JWT_REFRESH_TTL: jwt_refresh_ttl,
     CORS_ORIGINS: cors_origins,
+    ...smtp,
   };
 }

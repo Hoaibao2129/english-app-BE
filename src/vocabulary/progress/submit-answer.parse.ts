@@ -5,8 +5,8 @@ import type {
   StudyMode,
   SubmitAnswerInput,
 } from '../vocabulary.types.js';
+import { DIRECTIONS } from './direction.parse.js';
 
-const DIRECTIONS: readonly Direction[] = ['en_vi', 'vi_en'];
 const MODES: readonly StudyMode[] = ['flashcard', 'quiz', 'review'];
 export const MAX_ANSWER_LENGTH = 200;
 

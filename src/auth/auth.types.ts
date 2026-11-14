@@ -30,3 +30,32 @@ export interface LoginInput {
   email: string;
   password: string;
 }
+
+export interface ForgotPasswordInput {
+  email: string;
+}
+
+export interface VerifyOtpInput {
+  email: string;
+  otp: string;
+}
+
+export interface ResetPasswordInput {
+  reset_token: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+export interface OtpSentResult {
+  message: string;
+  expires_in_seconds: number;
+}
+
+export interface ResetTokenResult {
+  reset_token: string;
+  expires_in_seconds: number;
+}
+
+export interface MessageResult {
+  message: string;
+}
