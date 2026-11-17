@@ -9,6 +9,7 @@ import {
   RefreshToken,
   RefreshTokenSchema,
 } from './schemas/refresh-token.schema.js';
+import { RefreshTokensRepository } from './repositories/refresh-tokens.repository.js';
 import { TokenService } from './token.service.js';
 
 /**
@@ -34,7 +35,17 @@ import { TokenService } from './token.service.js';
       }),
     }),
   ],
-  providers: [RefreshTokenService, TokenService, JwtAuthGuard],
-  exports: [RefreshTokenService, TokenService, JwtAuthGuard],
+  providers: [
+    RefreshTokensRepository,
+    RefreshTokenService,
+    TokenService,
+    JwtAuthGuard,
+  ],
+  exports: [
+    RefreshTokensRepository,
+    RefreshTokenService,
+    TokenService,
+    JwtAuthGuard,
+  ],
 })
 export class AuthTokenModule {}

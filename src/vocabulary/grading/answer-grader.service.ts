@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Types } from 'mongoose';
 import { DEFAULT_GROQ_MODEL } from '../../config/env.validation.js';
 import { GroqService } from '../groq/groq.service.js';
-import { GradeCache } from '../schemas/grade-cache.schema.js';
+import { GradeCacheRepository } from '../repositories/grade-cache.repository.js';
 import { accepted_answers, normalize_answer } from '../text/answer-text.js';
 import type { Direction, GradeResult } from '../vocabulary.types.js';
 
@@ -31,7 +30,7 @@ export class AnswerGrader {
   constructor(
     private readonly groq: GroqService,
     private readonly config: ConfigService,
-    @InjectModel(GradeCache.name) private readonly cache: Model<GradeCache>,
+    private readonly grade_cache_repo: GradeCacheRepository,
   ) {}
 
   async grade(input: GradeInput): Promise<GradeResult> {
@@ -43,16 +42,19 @@ export class AnswerGrader {
       return { is_correct: true, graded_by: 'exact' };
     }
 
-    const key = { word_id: word._id, direction, normalized_answer: normalized };
-    const hit = await this.cache.findOne(key).lean();
+    const hit = await this.grade_cache_repo.findHit(
+      word._id,
+      direction,
+      normalized,
+    );
     if (hit) return { is_correct: hit.is_correct, graded_by: 'cache' };
 
-    if (!this.groq.is_configured()) {
+    if (!this.groq.isConfigured()) {
       return { is_correct: null, graded_by: 'ungraded' };
     }
-    const reply = await this.groq.complete_json(
+    const reply = await this.groq.completeJson(
       SYSTEM_PROMPT,
-      this.build_user_prompt(input),
+      this.buildUserPrompt(input),
     );
     const correct = reply?.correct;
     if (typeof correct !== 'boolean') {
@@ -60,15 +62,17 @@ export class AnswerGrader {
     }
 
     const model = this.config.get<string>('GROQ_MODEL') ?? DEFAULT_GROQ_MODEL;
-    await this.cache.updateOne(
-      key,
-      { $setOnInsert: { is_correct: correct, model } },
-      { upsert: true },
+    await this.grade_cache_repo.upsertCache(
+      word._id,
+      direction,
+      normalized,
+      correct,
+      model,
     );
     return { is_correct: correct, graded_by: 'ai' };
   }
 
-  private build_user_prompt(input: GradeInput): string {
+  private buildUserPrompt(input: GradeInput): string {
     const { word, direction, answer, topic_name } = input;
     return JSON.stringify({
       topic: topic_name,

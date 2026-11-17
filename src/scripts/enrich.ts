@@ -7,7 +7,7 @@ async function main(): Promise<number> {
     logger: ['error', 'warn'],
   });
   try {
-    const report = await app.get(EnrichService).enrich_pending();
+    const report = await app.get(EnrichService).enrichPending();
     if (report.skipped) {
       console.log('GROQ_API_KEY not set, skipped');
     } else {

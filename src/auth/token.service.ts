@@ -10,14 +10,14 @@ export class TokenService {
     private readonly refresh_tokens: RefreshTokenService,
   ) {}
 
-  sign_access_token(user: AuthUser): Promise<string> {
+  signAccessToken(user: AuthUser): Promise<string> {
     return this.jwt.signAsync(
       { sub: user.user_id, email: user.email, role: user.role },
       { algorithm: 'HS256' },
     );
   }
 
-  async verify_access_token(token: string): Promise<AuthUser> {
+  async verifyAccessToken(token: string): Promise<AuthUser> {
     let payload: { sub?: unknown; email?: unknown; role?: unknown };
     try {
       payload = await this.jwt.verifyAsync(token, { algorithms: ['HS256'] });
@@ -39,9 +39,9 @@ export class TokenService {
     };
   }
 
-  async issue_tokens(user: AuthUser): Promise<TokenPair> {
-    const access_token = await this.sign_access_token(user);
-    const refresh_token = await this.refresh_tokens.create_refresh_token(
+  async issueTokens(user: AuthUser): Promise<TokenPair> {
+    const access_token = await this.signAccessToken(user);
+    const refresh_token = await this.refresh_tokens.createRefreshToken(
       user.user_id,
     );
     return { access_token, refresh_token };

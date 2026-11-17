@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { start_mongo } from '../test-utils/mongo-memory.js';
+import { start_mongo } from '../../test/utils/mongo-memory.js';
 import { run_progress_direction_migration } from './progress-direction.migration.js';
 
 const { ObjectId } = mongoose.Types;

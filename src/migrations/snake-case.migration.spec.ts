@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { start_mongo } from '../test-utils/mongo-memory.js';
+import { start_mongo } from '../../test/utils/mongo-memory.js';
 import { run_snake_case_migration } from './snake-case.migration.js';
 
 describe('snake_case migration', () => {

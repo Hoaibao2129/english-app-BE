@@ -52,7 +52,7 @@ export class MailService {
    * Sends the OTP email. Resolves without sending when SMTP is not
    * configured; rejects when sending fails.
    */
-  async send_otp_email(
+  async sendOtpEmail(
     to: string,
     otp: string,
     ttl_minutes: number,

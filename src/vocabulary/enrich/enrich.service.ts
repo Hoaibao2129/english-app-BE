@@ -47,8 +47,8 @@ export class EnrichService {
     @InjectModel(Topic.name) private readonly topics: Model<Topic>,
   ) {}
 
-  async enrich_pending(batch_size = 20): Promise<EnrichReport> {
-    if (!this.groq.is_configured()) {
+  async enrichPending(batch_size = 20): Promise<EnrichReport> {
+    if (!this.groq.isConfigured()) {
       return { done: 0, failed: 0, skipped: true };
     }
     const model = this.config.get<string>('GROQ_MODEL') ?? DEFAULT_GROQ_MODEL;
@@ -79,7 +79,7 @@ export class EnrichService {
         en: w.en,
         vi: w.vi,
       }));
-      const reply = await this.groq.complete_json(
+      const reply = await this.groq.completeJson(
         SYSTEM_PROMPT,
         JSON.stringify({ words: payload }),
         ENRICH_TIMEOUT_MS,

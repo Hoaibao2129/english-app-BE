@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { start_mongo } from '../test-utils/mongo-memory.js';
+import { start_mongo } from '../../test/utils/mongo-memory.js';
 import { run_drop_version_key_migration } from './drop-version-key.migration.js';
 import { TopicSchema } from '../vocabulary/schemas/topic.schema.js';
 import { WordSchema } from '../vocabulary/schemas/word.schema.js';
