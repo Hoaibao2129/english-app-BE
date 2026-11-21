@@ -13,7 +13,7 @@ export class LegacyProgressService {
   ) {}
 
   /** Assigns progress/log rows that predate accounts to the given user. */
-  async claim_legacy_progress(
+  async claimLegacyProgress(
     user_id: string,
   ): Promise<{ progress: number; logs: number }> {
     const owner = new Types.ObjectId(user_id);

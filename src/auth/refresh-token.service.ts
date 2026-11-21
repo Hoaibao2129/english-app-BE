@@ -1,10 +1,9 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectModel } from '@nestjs/mongoose';
 import { createHash, randomBytes } from 'node:crypto';
-import { Model, Types } from 'mongoose';
+import { Types } from 'mongoose';
 import { parse_duration_ms } from '../config/env.validation.js';
-import { RefreshToken } from './schemas/refresh-token.schema.js';
+import { RefreshTokensRepository } from './repositories/refresh-tokens.repository.js';
 
 export const REUSE_GRACE_MS = 10_000;
 const INVALID_REFRESH_TOKEN = 'Invalid refresh token';
@@ -19,8 +18,7 @@ export class RefreshTokenService {
   now: () => Date = () => new Date();
 
   constructor(
-    @InjectModel(RefreshToken.name)
-    private readonly model: Model<RefreshToken>,
+    private readonly refresh_tokens_repo: RefreshTokensRepository,
     private readonly config: ConfigService,
   ) {}
 
@@ -39,9 +37,9 @@ export class RefreshTokenService {
     };
   }
 
-  async create_refresh_token(user_id: string): Promise<string> {
+  async createRefreshToken(user_id: string): Promise<string> {
     const { raw, _id, token_hash } = this.generate();
-    await this.model.create({
+    await this.refresh_tokens_repo.createToken({
       _id,
       user_id: new Types.ObjectId(user_id),
       token_hash,
@@ -60,16 +58,17 @@ export class RefreshTokenService {
     const next = this.generate();
 
     // Atomic claim: only one concurrent caller can revoke a live token.
-    const claimed = await this.model.findOneAndUpdate(
-      { token_hash, revoked_at: null, expires_at: { $gt: now } },
-      { $set: { revoked_at: now, replaced_by: next._id } },
+    const claimed = await this.refresh_tokens_repo.claimTokenForRotation(
+      token_hash,
+      now,
+      next._id,
     );
     if (!claimed) {
-      await this.handle_unclaimed(token_hash, now);
+      await this.handleUnclaimed(token_hash, now);
       throw new UnauthorizedException(INVALID_REFRESH_TOKEN);
     }
 
-    await this.model.create({
+    await this.refresh_tokens_repo.createToken({
       _id: next._id,
       user_id: claimed.user_id,
       token_hash: next.token_hash,
@@ -82,31 +81,22 @@ export class RefreshTokenService {
   }
 
   /** Reuse detection: a rotated token presented after the grace window. */
-  private async handle_unclaimed(token_hash: string, now: Date): Promise<void> {
-    const existing = await this.model.findOne({ token_hash });
+  private async handleUnclaimed(token_hash: string, now: Date): Promise<void> {
+    const existing = await this.refresh_tokens_repo.findByTokenHash(token_hash);
     if (
       existing?.revoked_at &&
       existing.replaced_by &&
       now.getTime() - existing.revoked_at.getTime() > REUSE_GRACE_MS
     ) {
-      await this.model.updateMany(
-        { user_id: existing.user_id, revoked_at: null },
-        { $set: { revoked_at: now } },
-      );
+      await this.refresh_tokens_repo.revokeAllForUser(existing.user_id, now);
     }
   }
 
   async revoke(raw: string): Promise<void> {
-    await this.model.updateOne(
-      { token_hash: hash_token(raw), revoked_at: null },
-      { $set: { revoked_at: this.now() } },
-    );
+    await this.refresh_tokens_repo.revokeToken(hash_token(raw), this.now());
   }
 
-  async revoke_all_for_user(user_id: string): Promise<void> {
-    await this.model.updateMany(
-      { user_id: new Types.ObjectId(user_id), revoked_at: null },
-      { $set: { revoked_at: this.now() } },
-    );
+  async revokeAllForUser(user_id: string): Promise<void> {
+    await this.refresh_tokens_repo.revokeAllForUser(user_id, this.now());
   }
 }

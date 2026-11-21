@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { AuthTokenModule } from './auth-token.module.js';
 import { User, UserSchema } from './schemas/user.schema.js';
+import { UsersRepository } from './repositories/users.repository.js';
 import { UsersService } from './users.service.js';
 
 @Module({
@@ -16,7 +17,7 @@ import { UsersService } from './users.service.js';
     VocabularyModule,
   ],
   controllers: [AuthController],
-  providers: [UsersService, AuthService],
-  exports: [AuthTokenModule],
+  providers: [UsersRepository, UsersService, AuthService],
+  exports: [AuthTokenModule, UsersRepository, UsersService],
 })
 export class AuthModule {}

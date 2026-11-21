@@ -6,7 +6,7 @@ import { Model, Types } from 'mongoose';
 import {
   mongoose_test_module,
   start_mongo,
-} from '../../test-utils/mongo-memory.js';
+} from '../../../test/utils/mongo-memory.js';
 import { VocabularyModule } from '../vocabulary.module.js';
 import { SeedService } from './seed.service.js';
 import { SourceTopic } from './vocabulary-file.js';

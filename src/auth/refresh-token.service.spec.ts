@@ -6,11 +6,12 @@ import { Model, Types } from 'mongoose';
 import {
   mongoose_test_module,
   start_mongo,
-} from '../test-utils/mongo-memory.js';
+} from '../../test/utils/mongo-memory.js';
 import {
   REUSE_GRACE_MS,
   RefreshTokenService,
 } from './refresh-token.service.js';
+import { RefreshTokensRepository } from './repositories/refresh-tokens.repository.js';
 import {
   RefreshToken,
   RefreshTokenSchema,
@@ -39,7 +40,7 @@ describe('RefreshTokenService', () => {
           { name: RefreshToken.name, schema: RefreshTokenSchema },
         ]),
       ],
-      providers: [RefreshTokenService],
+      providers: [RefreshTokensRepository, RefreshTokenService],
     }).compile();
     service = module_ref.get(RefreshTokenService);
     model = module_ref.get(getModelToken(RefreshToken.name));
@@ -57,7 +58,7 @@ describe('RefreshTokenService', () => {
   });
 
   it('stores only sha256 hash (raw token not found in DB)', async () => {
-    const raw = await service.create_refresh_token(user_id);
+    const raw = await service.createRefreshToken(user_id);
     expect(await model.findOne({ token_hash: raw })).toBeNull();
     const docs = await model.find({}).lean();
     expect(docs).toHaveLength(1);
@@ -66,7 +67,7 @@ describe('RefreshTokenService', () => {
   });
 
   it('rotate returns new token and old one is revoked with replaced_by', async () => {
-    const raw = await service.create_refresh_token(user_id);
+    const raw = await service.createRefreshToken(user_id);
     const result = await service.rotate(raw);
     expect(result.user_id).toBe(user_id);
     expect(result.refresh_token).not.toBe(raw);
@@ -76,7 +77,7 @@ describe('RefreshTokenService', () => {
   });
 
   it('rotation keeps the original absolute expires_at', async () => {
-    let raw = await service.create_refresh_token(user_id);
+    let raw = await service.createRefreshToken(user_id);
     const first = await model.findOne({});
     const original = first!.expires_at.getTime();
     const start = Date.now();
@@ -96,7 +97,7 @@ describe('RefreshTokenService', () => {
   });
 
   it('rotate of expired token -> 401', async () => {
-    const raw = await service.create_refresh_token(user_id);
+    const raw = await service.createRefreshToken(user_id);
     service.now = () => new Date(Date.now() + 2 * 24 * 3600 * 1000);
     await expect(service.rotate(raw)).rejects.toBeInstanceOf(
       UnauthorizedException,
@@ -104,7 +105,7 @@ describe('RefreshTokenService', () => {
   });
 
   it('reuse within 10 s -> 401 and the new token still works', async () => {
-    const raw = await service.create_refresh_token(user_id);
+    const raw = await service.createRefreshToken(user_id);
     const { refresh_token } = await service.rotate(raw);
     await expect(service.rotate(raw)).rejects.toBeInstanceOf(
       UnauthorizedException,
@@ -113,7 +114,7 @@ describe('RefreshTokenService', () => {
   });
 
   it('reuse after 10 s -> 401 and the new token is revoked too', async () => {
-    const raw = await service.create_refresh_token(user_id);
+    const raw = await service.createRefreshToken(user_id);
     const { refresh_token } = await service.rotate(raw);
     service.now = () => new Date(Date.now() + REUSE_GRACE_MS + 1000);
     await expect(service.rotate(raw)).rejects.toBeInstanceOf(
@@ -126,7 +127,7 @@ describe('RefreshTokenService', () => {
   });
 
   it('concurrent rotations of one token: exactly one succeeds', async () => {
-    const raw = await service.create_refresh_token(user_id);
+    const raw = await service.createRefreshToken(user_id);
     const results = await Promise.allSettled([
       service.rotate(raw),
       service.rotate(raw),
@@ -137,7 +138,7 @@ describe('RefreshTokenService', () => {
 
   it('revoke unknown token resolves; revoked token cannot rotate', async () => {
     await expect(service.revoke('unknown')).resolves.toBeUndefined();
-    const raw = await service.create_refresh_token(user_id);
+    const raw = await service.createRefreshToken(user_id);
     await service.revoke(raw);
     await service.revoke(raw);
     await expect(service.rotate(raw)).rejects.toBeInstanceOf(
@@ -147,11 +148,11 @@ describe('RefreshTokenService', () => {
 
   it('revoke_all_for_user revokes only that user tokens', async () => {
     const other_user_id = new Types.ObjectId().toString();
-    const mine_1 = await service.create_refresh_token(user_id);
-    const mine_2 = await service.create_refresh_token(user_id);
-    const theirs = await service.create_refresh_token(other_user_id);
+    const mine_1 = await service.createRefreshToken(user_id);
+    const mine_2 = await service.createRefreshToken(user_id);
+    const theirs = await service.createRefreshToken(other_user_id);
 
-    await service.revoke_all_for_user(user_id);
+    await service.revokeAllForUser(user_id);
 
     await expect(service.rotate(mine_1)).rejects.toBeInstanceOf(
       UnauthorizedException,

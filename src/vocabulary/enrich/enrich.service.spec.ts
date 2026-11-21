@@ -1,16 +1,16 @@
-import { jest } from '@jest/globals';
-import { Test } from '@nestjs/testing';
 import { INestApplicationContext } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { getModelToken } from '@nestjs/mongoose';
+import { Test } from '@nestjs/testing';
 import { Model } from 'mongoose';
+import { jest } from '@jest/globals';
 import {
   mongoose_test_module,
   start_mongo,
-} from '../../test-utils/mongo-memory.js';
-import { VocabularyModule } from '../vocabulary.module.js';
+} from '../../../test/utils/mongo-memory.js';
 import { GroqService } from '../groq/groq.service.js';
 import { EnrichService } from './enrich.service.js';
+import { VocabularyModule } from '../vocabulary.module.js';
 import { Topic } from '../schemas/topic.schema.js';
 import { Word } from '../schemas/word.schema.js';
 
@@ -21,10 +21,14 @@ describe('EnrichService', () => {
   let topics: Model<Topic>;
   let words: Model<Word>;
   const groq = {
-    is_configured: jest.fn<() => boolean>(),
-    complete_json:
+    isConfigured: jest.fn<() => boolean>(),
+    completeJson:
       jest.fn<
-        (s: string, u: string) => Promise<Record<string, unknown> | null>
+        (
+          s: string,
+          u: string,
+          timeout?: number,
+        ) => Promise<Record<string, unknown> | null>
       >(),
   };
 
@@ -56,8 +60,8 @@ describe('EnrichService', () => {
   });
 
   beforeEach(async () => {
-    groq.is_configured.mockReset().mockReturnValue(true);
-    groq.complete_json.mockReset();
+    groq.isConfigured.mockReset().mockReturnValue(true);
+    groq.completeJson.mockReset();
     await topics.deleteMany({});
     await words.deleteMany({});
     const topic = await topics.create({
@@ -89,10 +93,10 @@ describe('EnrichService', () => {
   const get = (key: string) => words.findOne({ key }).lean();
 
   it('fills ipa/pos/example and sets status done with model and at', async () => {
-    groq.complete_json.mockResolvedValue({
+    groq.completeJson.mockResolvedValue({
       items: [item('food:apple'), item('food:eat', { pos: 'verb' })],
     });
-    const r = await enrich.enrich_pending();
+    const r = await enrich.enrichPending();
     expect(r).toEqual({ done: 2, failed: 0, skipped: false });
     const w = await get('food:apple');
     expect(w?.ipa).toBe('/x/');
@@ -104,13 +108,13 @@ describe('EnrichService', () => {
   });
 
   it('invalid pos is stored as null, empty ipa as null', async () => {
-    groq.complete_json.mockResolvedValue({
+    groq.completeJson.mockResolvedValue({
       items: [
         item('food:apple', { pos: 'thing', ipa: '' }),
         item('food:eat', { example: { en: 'x' } }),
       ],
     });
-    const r = await enrich.enrich_pending();
+    const r = await enrich.enrichPending();
     expect(r).toMatchObject({ done: 1, failed: 1 });
     const a = await get('food:apple');
     expect(a?.pos).toBeNull();
@@ -119,14 +123,14 @@ describe('EnrichService', () => {
   });
 
   it('uses the long enrich timeout', async () => {
-    groq.complete_json.mockResolvedValue({ items: [item('food:apple')] });
-    await enrich.enrich_pending();
-    expect(groq.complete_json.mock.calls[0][2]).toBe(30000);
+    groq.completeJson.mockResolvedValue({ items: [item('food:apple')] });
+    await enrich.enrichPending();
+    expect(groq.completeJson.mock.calls[0][2]).toBe(30000);
   });
 
   it('word missing from reply → status failed', async () => {
-    groq.complete_json.mockResolvedValue({ items: [item('food:apple')] });
-    const r = await enrich.enrich_pending();
+    groq.completeJson.mockResolvedValue({ items: [item('food:apple')] });
+    const r = await enrich.enrichPending();
     expect(r).toMatchObject({ done: 1, failed: 1 });
     expect((await get('food:eat'))?.enrichment.status).toBe('failed');
   });
@@ -140,52 +144,52 @@ describe('EnrichService', () => {
       { key: 'food:eat' },
       { $set: { 'enrichment.status': 'done' } },
     );
-    const r = await enrich.enrich_pending();
+    const r = await enrich.enrichPending();
     expect(r).toEqual({ done: 0, failed: 0, skipped: false });
-    expect(groq.complete_json).not.toHaveBeenCalled();
+    expect(groq.completeJson).not.toHaveBeenCalled();
     expect((await get('food:apple'))?.ipa).toBe('/mine/');
   });
 
   it('does not overwrite a word edited while the request was in flight', async () => {
-    groq.complete_json.mockImplementation(async () => {
+    groq.completeJson.mockImplementation(async () => {
       await words.updateOne(
         { key: 'food:apple' },
         { $set: { 'enrichment.status': 'edited', ipa: '/mine/' } },
       );
       return { items: [item('food:apple'), item('food:eat')] };
     });
-    await enrich.enrich_pending();
+    await enrich.enrichPending();
     const w = await get('food:apple');
     expect(w?.ipa).toBe('/mine/');
     expect(w?.enrichment.status).toBe('edited');
   });
 
   it("retries 'failed' words on next run", async () => {
-    groq.complete_json.mockResolvedValueOnce({ items: [item('food:apple')] });
-    await enrich.enrich_pending();
-    groq.complete_json.mockResolvedValueOnce({
+    groq.completeJson.mockResolvedValueOnce({ items: [item('food:apple')] });
+    await enrich.enrichPending();
+    groq.completeJson.mockResolvedValueOnce({
       items: [item('food:eat', { pos: 'verb' })],
     });
-    const r = await enrich.enrich_pending();
+    const r = await enrich.enrichPending();
     expect(r).toEqual({ done: 1, failed: 0, skipped: false });
     expect((await get('food:eat'))?.enrichment.status).toBe('done');
   });
 
   it('groq null for a batch → whole batch failed, run continues', async () => {
-    groq.complete_json
+    groq.completeJson
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ items: [item('food:eat', { pos: 'verb' })] });
-    const r = await enrich.enrich_pending(1);
+    const r = await enrich.enrichPending(1);
     expect(r).toEqual({ done: 1, failed: 1, skipped: false });
     expect((await get('food:apple'))?.enrichment.status).toBe('failed');
     expect((await get('food:eat'))?.enrichment.status).toBe('done');
   });
 
   it('skipped when not configured', async () => {
-    groq.is_configured.mockReturnValue(false);
-    const r = await enrich.enrich_pending();
+    groq.isConfigured.mockReturnValue(false);
+    const r = await enrich.enrichPending();
     expect(r).toEqual({ done: 0, failed: 0, skipped: true });
-    expect(groq.complete_json).not.toHaveBeenCalled();
+    expect(groq.completeJson).not.toHaveBeenCalled();
     expect((await get('food:apple'))?.enrichment.status).toBe('pending');
   });
 });

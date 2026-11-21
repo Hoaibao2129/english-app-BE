@@ -7,7 +7,7 @@ describe('JwtAuthGuard', () => {
   const user = { user_id: 'u1', email: 'a@x.com', role: 'user' as const };
   const verify = jest.fn<(t: string) => Promise<typeof user>>();
   const guard = new JwtAuthGuard({
-    verify_access_token: verify,
+    verifyAccessToken: verify,
   } as unknown as TokenService);
 
   const ctx = (authorization?: string) => {

@@ -9,7 +9,7 @@ globs:
 
 ## Quy tắc
 - Unit test đặt cạnh file nguồn: `x.service.ts` → `x.service.spec.ts`.
-- Test có DB dùng `start_mongo()` + `mongoose_test_module()` trong `src/test-utils/mongo-memory.ts`; không gọi DB thật.
+- Test có DB dùng `start_mongo()` + `mongoose_test_module()` trong `test/utils/mongo-memory.ts`; không gọi DB thật.
 - Mock dịch vụ ngoài (Groq...) bằng `jest.fn` import từ `@jest/globals`.
 - Test phải kiểm tra phân quyền dữ liệu: user A không thấy dữ liệu user B.
 - Chạy test: `npm test -- <file>`; không chạy `npx jest` trực tiếp.

@@ -16,6 +16,11 @@ import { LegacyProgressService } from './progress/legacy-progress.service.js';
 import { VocabularyController } from './vocabulary.controller.js';
 import { SeedService } from './seed/seed.service.js';
 import { EnrichService } from './enrich/enrich.service.js';
+import { TopicsRepository } from './repositories/topics.repository.js';
+import { WordsRepository } from './repositories/words.repository.js';
+import { WordProgressRepository } from './repositories/word-progress.repository.js';
+import { AnswerLogsRepository } from './repositories/answer-logs.repository.js';
+import { GradeCacheRepository } from './repositories/grade-cache.repository.js';
 
 @Module({
   imports: [
@@ -30,6 +35,11 @@ import { EnrichService } from './enrich/enrich.service.js';
   ],
   controllers: [VocabularyController],
   providers: [
+    TopicsRepository,
+    WordsRepository,
+    WordProgressRepository,
+    AnswerLogsRepository,
+    GradeCacheRepository,
     SeedService,
     GroqService,
     AnswerGrader,
@@ -37,6 +47,16 @@ import { EnrichService } from './enrich/enrich.service.js';
     LegacyProgressService,
     EnrichService,
   ],
-  exports: [SeedService, ProgressService, LegacyProgressService, EnrichService],
+  exports: [
+    TopicsRepository,
+    WordsRepository,
+    WordProgressRepository,
+    AnswerLogsRepository,
+    GradeCacheRepository,
+    SeedService,
+    ProgressService,
+    LegacyProgressService,
+    EnrichService,
+  ],
 })
 export class VocabularyModule {}

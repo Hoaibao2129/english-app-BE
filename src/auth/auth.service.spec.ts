@@ -14,7 +14,7 @@ import bcrypt from 'bcryptjs';
 import {
   mongoose_test_module,
   start_mongo,
-} from '../test-utils/mongo-memory.js';
+} from '../../test/utils/mongo-memory.js';
 import { AuthModule } from './auth.module.js';
 import { AuthService } from './auth.service.js';
 import { WordProgress } from '../vocabulary/schemas/word-progress.schema.js';
@@ -60,7 +60,7 @@ describe('AuthService', () => {
 
   it('register hashes password', async () => {
     await auth.register({ email: 'a@x.com', password: 'password1' });
-    const doc = await users.find_by_email('a@x.com');
+    const doc = await users.findByEmail('a@x.com');
     expect(doc!.password_hash).not.toBe('password1');
     expect(await bcrypt.compare('password1', doc!.password_hash)).toBe(true);
   });
@@ -119,7 +119,7 @@ describe('AuthService', () => {
     });
     expect(JSON.stringify(result)).not.toContain('password_hash');
     expect(result.user.display_name).toBe('Nam');
-    expect(await auth.get_me(result.user.id)).toEqual(result.user);
+    expect(await auth.getMe(result.user.id)).toEqual(result.user);
   });
 
   it('first register claims legacy rows without user_id; second claims nothing', async () => {
@@ -176,7 +176,7 @@ describe('AuthService', () => {
       { sub: 'not-an-object-id', email: 'a@x.com', role: 'user' },
       { algorithm: 'HS256' },
     );
-    await expect(tokens.verify_access_token(token)).rejects.toBeInstanceOf(
+    await expect(tokens.verifyAccessToken(token)).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
   });
@@ -210,7 +210,7 @@ describe('AuthService', () => {
     let fail_mail: boolean;
 
     const latest_otp = (): string => /\d{6}/.exec(sent.at(-1)!.text)![0];
-    const request_otp = (email: string) => auth.request_password_otp({ email });
+    const request_otp = (email: string) => auth.requestPasswordOtp({ email });
     const wrong_otp = (otp: string) => (otp === '000000' ? '111111' : '000000');
 
     beforeEach(async () => {
@@ -262,7 +262,7 @@ describe('AuthService', () => {
       await expect(request_otp('fa@x.com')).rejects.toBeInstanceOf(
         ServiceUnavailableException,
       );
-      const doc = await users.find_by_email('fa@x.com');
+      const doc = await users.findByEmail('fa@x.com');
       expect(doc!.password_reset).toBeNull();
     });
 
@@ -273,27 +273,27 @@ describe('AuthService', () => {
       const second = latest_otp();
       if (first !== second) {
         await expect(
-          auth.verify_password_otp({ email: 'fa@x.com', otp: first }),
+          auth.verifyPasswordOtp({ email: 'fa@x.com', otp: first }),
         ).rejects.toBeInstanceOf(BadRequestException);
       }
       await expect(
-        auth.verify_password_otp({ email: 'fa@x.com', otp: second }),
+        auth.verifyPasswordOtp({ email: 'fa@x.com', otp: second }),
       ).resolves.toEqual(expect.objectContaining({ expires_in_seconds: 300 }));
     });
 
     it('verify throws 404 for an unknown email and 400 when no otp was requested', async () => {
       await expect(
-        auth.verify_password_otp({ email: 'nobody@x.com', otp: '123456' }),
+        auth.verifyPasswordOtp({ email: 'nobody@x.com', otp: '123456' }),
       ).rejects.toBeInstanceOf(NotFoundException);
       await expect(
-        auth.verify_password_otp({ email: 'fa@x.com', otp: '123456' }),
+        auth.verifyPasswordOtp({ email: 'fa@x.com', otp: '123456' }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('verify throws 400 for a wrong otp', async () => {
       await request_otp('fa@x.com');
       await expect(
-        auth.verify_password_otp({
+        auth.verifyPasswordOtp({
           email: 'fa@x.com',
           otp: wrong_otp(latest_otp()),
         }),
@@ -305,7 +305,7 @@ describe('AuthService', () => {
       const otp = latest_otp();
       auth.now = () => new Date(Date.now() + 5 * 60_000 + 1000);
       await expect(
-        auth.verify_password_otp({ email: 'fa@x.com', otp }),
+        auth.verifyPasswordOtp({ email: 'fa@x.com', otp }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -314,25 +314,25 @@ describe('AuthService', () => {
       const otp = latest_otp();
       for (let i = 0; i < 5; i++) {
         await expect(
-          auth.verify_password_otp({ email: 'fa@x.com', otp: wrong_otp(otp) }),
+          auth.verifyPasswordOtp({ email: 'fa@x.com', otp: wrong_otp(otp) }),
         ).rejects.toBeInstanceOf(BadRequestException);
       }
       await expect(
-        auth.verify_password_otp({ email: 'fa@x.com', otp }),
+        auth.verifyPasswordOtp({ email: 'fa@x.com', otp }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('verify returns a reset token and the otp cannot be reused', async () => {
       await request_otp('fa@x.com');
       const otp = latest_otp();
-      const result = await auth.verify_password_otp({
+      const result = await auth.verifyPasswordOtp({
         email: 'fa@x.com',
         otp,
       });
       expect(result.reset_token).toEqual(expect.any(String));
       expect(result.expires_in_seconds).toBe(300);
       await expect(
-        auth.verify_password_otp({ email: 'fa@x.com', otp }),
+        auth.verifyPasswordOtp({ email: 'fa@x.com', otp }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -343,14 +343,14 @@ describe('AuthService', () => {
       const otp_a = /\d{6}/.exec(sent[0].text)![0];
       if (otp_a !== otp_b) {
         await expect(
-          auth.verify_password_otp({ email: 'fa@x.com', otp: otp_b }),
+          auth.verifyPasswordOtp({ email: 'fa@x.com', otp: otp_b }),
         ).rejects.toBeInstanceOf(BadRequestException);
       }
     });
 
     const get_reset_token = async (email: string): Promise<string> => {
       await request_otp(email);
-      const { reset_token } = await auth.verify_password_otp({
+      const { reset_token } = await auth.verifyPasswordOtp({
         email,
         otp: latest_otp(),
       });
@@ -359,7 +359,7 @@ describe('AuthService', () => {
 
     it('reset throws 401 for an unknown or expired token', async () => {
       await expect(
-        auth.reset_password({
+        auth.resetPassword({
           reset_token: 'nope',
           new_password: 'newpassword1',
           confirm_password: 'newpassword1',
@@ -369,7 +369,7 @@ describe('AuthService', () => {
       const reset_token = await get_reset_token('fa@x.com');
       auth.now = () => new Date(Date.now() + 5 * 60_000 + 1000);
       await expect(
-        auth.reset_password({
+        auth.resetPassword({
           reset_token,
           new_password: 'newpassword1',
           confirm_password: 'newpassword1',
@@ -381,7 +381,7 @@ describe('AuthService', () => {
       const reset_token = await get_reset_token('fa@x.com');
       let error: BadRequestException | undefined;
       try {
-        await auth.reset_password({
+        await auth.resetPassword({
           reset_token,
           new_password: 'newpassword1',
           confirm_password: 'different1',
@@ -400,14 +400,14 @@ describe('AuthService', () => {
         auth.login({ email: 'fa@x.com', password: 'password1' }),
       ).resolves.toBeDefined();
       await expect(
-        auth.reset_password({
+        auth.resetPassword({
           reset_token,
           new_password: 'newpassword1',
           confirm_password: 'newpassword1',
         }),
       ).rejects.toBeInstanceOf(UnauthorizedException);
       await expect(
-        auth.reset_password({
+        auth.resetPassword({
           reset_token: next,
           new_password: 'newpassword1',
           confirm_password: 'newpassword1',
@@ -431,7 +431,7 @@ describe('AuthService', () => {
         confirm_password: 'newpassword1',
       };
 
-      await expect(auth.reset_password(input)).resolves.toEqual({
+      await expect(auth.resetPassword(input)).resolves.toEqual({
         message: 'Password reset successfully',
       });
 
@@ -441,7 +441,7 @@ describe('AuthService', () => {
       await expect(
         auth.login({ email: 'fa@x.com', password: 'newpassword1' }),
       ).resolves.toBeDefined();
-      await expect(auth.reset_password(input)).rejects.toBeInstanceOf(
+      await expect(auth.resetPassword(input)).rejects.toBeInstanceOf(
         UnauthorizedException,
       );
       await expect(auth.refresh(login_a.refresh_token)).rejects.toBeInstanceOf(
@@ -451,7 +451,7 @@ describe('AuthService', () => {
       expect(
         module_ref.get(RefreshTokenService, { strict: false }),
       ).toBeDefined();
-      const user_b = await users.find_by_email('fb@x.com');
+      const user_b = await users.findByEmail('fb@x.com');
       expect(await bcrypt.compare('password1', user_b!.password_hash)).toBe(
         true,
       );
