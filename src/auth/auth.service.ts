@@ -49,7 +49,7 @@ const EMAIL_NOT_REGISTERED = 'Email is not registered';
 const INVALID_OTP = 'OTP is invalid or expired';
 const INVALID_RESET_TOKEN = 'Reset token is invalid or expired';
 
-function hash_reset_token(raw: string): string {
+function hashResetToken(raw: string): string {
   return createHash('sha256').update(raw).digest('hex');
 }
 
@@ -69,13 +69,13 @@ export class AuthService {
 
   async register(input: RegisterInput): Promise<AuthResult> {
     const email = input.email.trim().toLowerCase();
-    if (await this.users.find_by_email(email)) {
+    if (await this.users.findByEmail(email)) {
       throw new ConflictException('Email is already registered');
     }
     const password_hash = await bcrypt.hash(input.password, BCRYPT_COST);
     let user: UserDocument;
     try {
-      user = await this.users.create_user({
+      user = await this.users.createUser({
         email,
         password_hash,
         display_name: input.display_name ?? null,
@@ -88,14 +88,14 @@ export class AuthService {
     }
     // The first account inherits pre-auth progress. Errors propagate (500)
     // rather than being swallowed, so a failed claim is never silent.
-    if ((await this.users.count_users()) === 1) {
-      await this.legacy.claim_legacy_progress(user._id.toHexString());
+    if ((await this.users.countUsers()) === 1) {
+      await this.legacy.claimLegacyProgress(user._id.toHexString());
     }
-    return this.build_result(user);
+    return this.buildResult(user);
   }
 
   async login(input: LoginInput): Promise<AuthResult> {
-    const user = await this.users.find_by_email(input.email);
+    const user = await this.users.findByEmail(input.email);
     const matches = await bcrypt.compare(
       input.password,
       user?.password_hash ?? DUMMY_HASH,
@@ -105,28 +105,28 @@ export class AuthService {
     }
     // Retry the idempotent claim for the sole account, in case it failed
     // during registration.
-    if ((await this.users.count_users()) === 1) {
-      await this.legacy.claim_legacy_progress(user._id.toHexString());
+    if ((await this.users.countUsers()) === 1) {
+      await this.legacy.claimLegacyProgress(user._id.toHexString());
     }
-    return this.build_result(user);
+    return this.buildResult(user);
   }
 
-  async get_me(user_id: string): Promise<PublicUser> {
-    const user = await this.users.find_by_id(user_id);
+  async getMe(user_id: string): Promise<PublicUser> {
+    const user = await this.users.findById(user_id);
     if (!user) {
       throw new UnauthorizedException('User no longer exists');
     }
-    return this.users.to_public(user);
+    return this.users.toPublic(user);
   }
 
   async refresh(raw: string): Promise<TokenPair> {
     const rotated = await this.refresh_tokens.rotate(raw);
-    const user = await this.users.find_by_id(rotated.user_id);
+    const user = await this.users.findById(rotated.user_id);
     if (!user) {
       await this.refresh_tokens.revoke(rotated.refresh_token);
       throw new UnauthorizedException('Invalid refresh token');
     }
-    const access_token = await this.tokens.sign_access_token({
+    const access_token = await this.tokens.signAccessToken({
       user_id: rotated.user_id,
       email: user.email,
       role: user.role,
@@ -138,10 +138,10 @@ export class AuthService {
     return this.refresh_tokens.revoke(raw);
   }
 
-  async request_password_otp(
+  async requestPasswordOtp(
     input: ForgotPasswordInput,
   ): Promise<OtpSentResult> {
-    const user = await this.users.find_by_email(input.email);
+    const user = await this.users.findByEmail(input.email);
     if (!user) {
       throw new NotFoundException(EMAIL_NOT_REGISTERED);
     }
@@ -150,22 +150,22 @@ export class AuthService {
       OTP_LENGTH,
       '0',
     );
-    await this.users.save_password_reset(
+    await this.users.savePasswordReset(
       user_id,
-      this.hash_otp(user_id, otp),
+      this.hashOtp(user_id, otp),
       new Date(this.now().getTime() + OTP_TTL_MS),
     );
     try {
-      await this.mail.send_otp_email(user.email, otp, OTP_TTL_MS / 60_000);
+      await this.mail.sendOtpEmail(user.email, otp, OTP_TTL_MS / 60_000);
     } catch {
-      await this.users.clear_password_reset(user_id);
+      await this.users.clearPasswordReset(user_id);
       throw new ServiceUnavailableException('Unable to send OTP email');
     }
     return { message: 'OTP sent', expires_in_seconds: OTP_TTL_MS / 1000 };
   }
 
-  async verify_password_otp(input: VerifyOtpInput): Promise<ResetTokenResult> {
-    const user = await this.users.find_by_email(input.email);
+  async verifyPasswordOtp(input: VerifyOtpInput): Promise<ResetTokenResult> {
+    const user = await this.users.findByEmail(input.email);
     if (!user) {
       throw new NotFoundException(EMAIL_NOT_REGISTERED);
     }
@@ -180,21 +180,21 @@ export class AuthService {
     ) {
       throw new BadRequestException(INVALID_OTP);
     }
-    const expected = this.hash_otp(user_id, input.otp);
+    const expected = this.hashOtp(user_id, input.otp);
     const matches =
       expected.length === state.otp_hash.length &&
       timingSafeEqual(Buffer.from(expected), Buffer.from(state.otp_hash));
     if (!matches) {
-      await this.users.record_failed_otp(user_id, MAX_OTP_ATTEMPTS);
+      await this.users.recordFailedOtp(user_id, MAX_OTP_ATTEMPTS);
       throw new BadRequestException(INVALID_OTP);
     }
     const reset_token = randomBytes(32).toString('base64url');
-    const consumed = await this.users.consume_otp(
+    const consumed = await this.users.consumeOtp(
       user_id,
       state.otp_hash,
       MAX_OTP_ATTEMPTS,
       now,
-      hash_reset_token(reset_token),
+      hashResetToken(reset_token),
       new Date(now.getTime() + RESET_TOKEN_TTL_MS),
     );
     if (!consumed) {
@@ -206,19 +206,19 @@ export class AuthService {
     };
   }
 
-  async reset_password(input: ResetPasswordInput): Promise<MessageResult> {
+  async resetPassword(input: ResetPasswordInput): Promise<MessageResult> {
     const now = this.now();
-    const token_hash = hash_reset_token(input.reset_token);
-    const user = await this.users.find_by_reset_token_hash(token_hash, now);
+    const token_hash = hashResetToken(input.reset_token);
+    const user = await this.users.findByResetTokenHash(token_hash, now);
     if (!user) {
       throw new UnauthorizedException(INVALID_RESET_TOKEN);
     }
     if (input.new_password !== input.confirm_password) {
       // Hand out a fresh token so the user can retry without a new OTP.
       const next_token = randomBytes(32).toString('base64url');
-      const rotated = await this.users.rotate_reset_token(
+      const rotated = await this.users.rotateResetToken(
         token_hash,
-        hash_reset_token(next_token),
+        hashResetToken(next_token),
         new Date(now.getTime() + RESET_TOKEN_TTL_MS),
         now,
       );
@@ -234,7 +234,7 @@ export class AuthService {
       });
     }
     const password_hash = await bcrypt.hash(input.new_password, BCRYPT_COST);
-    const user_id = await this.users.consume_reset_token(
+    const user_id = await this.users.consumeResetToken(
       token_hash,
       now,
       password_hash,
@@ -242,20 +242,20 @@ export class AuthService {
     if (!user_id) {
       throw new UnauthorizedException(INVALID_RESET_TOKEN);
     }
-    await this.refresh_tokens.revoke_all_for_user(user_id);
+    await this.refresh_tokens.revokeAllForUser(user_id);
     return { message: 'Password reset successfully' };
   }
 
   /** Keyed hash so a leaked DB cannot be brute-forced from the 6-digit space. */
-  private hash_otp(user_id: string, otp: string): string {
+  private hashOtp(user_id: string, otp: string): string {
     return createHmac('sha256', this.config.getOrThrow<string>('JWT_SECRET'))
       .update(`${user_id}:${otp}`)
       .digest('hex');
   }
 
-  private async build_result(user: UserDocument): Promise<AuthResult> {
-    const public_user = this.users.to_public(user);
-    const tokens = await this.tokens.issue_tokens({
+  private async buildResult(user: UserDocument): Promise<AuthResult> {
+    const public_user = this.users.toPublic(user);
+    const tokens = await this.tokens.issueTokens({
       user_id: public_user.id,
       email: public_user.email,
       role: public_user.role,

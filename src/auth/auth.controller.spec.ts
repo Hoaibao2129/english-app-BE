@@ -6,7 +6,7 @@ import request from 'supertest';
 import {
   mongoose_test_module,
   start_mongo,
-} from '../test-utils/mongo-memory.js';
+} from '../../test/utils/mongo-memory.js';
 import { AuthModule } from './auth.module.js';
 import { MailService } from '../mail/mail.service.js';
 

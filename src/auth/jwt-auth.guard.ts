@@ -22,7 +22,7 @@ export class JwtAuthGuard implements CanActivate {
     if (!match) {
       throw new UnauthorizedException('Missing or malformed bearer token');
     }
-    request.user = await this.tokens.verify_access_token(match[1]);
+    request.user = await this.tokens.verifyAccessToken(match[1]);
     return true;
   }
 }

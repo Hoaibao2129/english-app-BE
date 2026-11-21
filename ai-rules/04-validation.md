@@ -1,33 +1,41 @@
 ---
-description: Validate input bằng hàm parse_* tự viết, không dùng class-validator
+description: Validate input bằng Zod Schemas và ZodValidationPipe
 globs:
-  - "src/**/*.parse.ts"
+  - "src/**/*.dto.ts"
   - "src/**/*.controller.ts"
-  - "src/**/*.types.ts"
+  - "src/common/zod-validation.pipe.ts"
 ---
 
-# Validate input
+# Validate input (Zod DTO Pattern)
 
-Dự án **không** dùng class-validator / Joi. Input được validate bằng hàm `parse_*` viết tay.
+Dự án sử dụng **Zod** để định nghĩa schema và validate input thông qua `ZodValidationPipe`.
 
 ## Pattern
 ```ts
-export function parse_submit_answer(body: unknown): SubmitAnswerInput {
-  const { word_id, answer } = as_object(body);
-  if (!is_object_id_string(word_id)) {
-    throw new BadRequestException('word_id must be a valid ObjectId');
-  }
-  ...
-  return { word_id, answer };
+// src/<feature>/<feature>.dto.ts
+import { z } from 'zod';
+
+export const SubmitAnswerDtoSchema = z.object({
+  word_id: z.string({ message: 'word_id must be a valid ObjectId' }),
+  direction: z.enum(['en_vi', 'vi_en'], {
+    message: 'direction must be one of: en_vi, vi_en',
+  }),
+  answer: z.string().max(200),
+});
+export type SubmitAnswerDto = z.infer<typeof SubmitAnswerDtoSchema>;
+
+// src/<feature>/<feature>.controller.ts
+@Post('answers')
+submit_answer(
+  @Body(new ZodValidationPipe(SubmitAnswerDtoSchema)) dto: SubmitAnswerDto,
+) {
+  return this.service.submit_answer(dto);
 }
 ```
 
 ## Quy tắc
-- Đặt trong file `*.parse.ts`, nhận `unknown`, trả về kiểu `*Input` khai báo trong `*.types.ts`.
-- Lỗi → `BadRequestException` với message dạng `<field> must be ...`.
-- Giới hạn (độ dài, min/max) là hằng `UPPER_SNAKE_CASE` ở đầu file, dùng lại trong message.
-- Chuỗi được `trim()`; chuỗi rỗng sau trim của field optional → `null`.
-- Giá trị enum: khai báo mảng `readonly` rồi kiểm tra `includes`.
-- Route param là ObjectId: kiểm tra bằng `is_object_id_string` trước khi query.
-- Mỗi hàm parse có unit test cho cả case hợp lệ và từng case lỗi.
-- Dùng helper chung trong `src/common/input.parse.ts`: `as_object(body)` và `is_object_id_string(value)`. Không viết lại.
+- Schemas và DTO types đặt trong file `<feature>.dto.ts`.
+- Lỗi validation → `BadRequestException` với message tiếng Anh rõ ràng (dùng `{ message: '...' }` trong Zod).
+- Chuỗi string cần trim() và ép kiểu phù hợp; trường optional nếu rỗng chuyển về `null`.
+- Route param là ObjectId: kiểm tra bằng `is_object_id_string` hoặc Zod refine.
+- Controller sử dụng `@Body(new ZodValidationPipe(Schema))` hoặc `@Query(..., new ZodValidationPipe(Schema))` để tự động validate.

@@ -5,7 +5,11 @@ export async function start_mongo(): Promise<{
   uri: string;
   stop(): Promise<void>;
 }> {
-  const server = await MongoMemoryServer.create();
+  const server = await MongoMemoryServer.create({
+    binary: {
+      version: process.env.MONGOMS_VERSION || '6.0.19',
+    },
+  });
   return {
     uri: server.getUri(),
     stop: async () => {
@@ -21,3 +25,4 @@ export function mongoose_test_module(uri: string) {
     serverSelectionTimeoutMS: 5000,
   });
 }
+

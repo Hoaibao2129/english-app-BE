@@ -13,13 +13,15 @@ import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { AuthUser } from '../auth/auth.types.js';
+import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { ProgressService } from './progress/progress.service.js';
-import { parse_submit_answer } from './progress/submit-answer.parse.js';
 import {
   DIRECTIONS,
-  parse_direction,
-  parse_optional_direction,
-} from './progress/direction.parse.js';
+  DirectionSchema,
+  OptionalDirectionSchema,
+  SubmitAnswerDtoSchema,
+} from './vocabulary.dto.js';
+import type { Direction, SubmitAnswerDto } from './vocabulary.dto.js';
 import type {
   SubmitAnswerResult,
   SummaryDto,
@@ -49,11 +51,12 @@ export class VocabularyController {
     summary: 'List topics with per-topic progress counts of one direction',
   })
   @ApiQuery(DIRECTION_QUERY)
-  list_topics(
+  listTopics(
     @CurrentUser() user: AuthUser,
-    @Query('direction') direction: unknown,
+    @Query('direction', new ZodValidationPipe(DirectionSchema))
+    direction: Direction,
   ): Promise<TopicSummaryDto[]> {
-    return this.progress.list_topics(user.user_id, parse_direction(direction));
+    return this.progress.listTopics(user.user_id, direction);
   }
 
   @Get('topics/:topic_id')
@@ -61,16 +64,13 @@ export class VocabularyController {
     summary: 'Get a topic with its words and word status of one direction',
   })
   @ApiQuery(DIRECTION_QUERY)
-  get_topic(
+  getTopic(
     @CurrentUser() user: AuthUser,
     @Param('topic_id') topic_id: string,
-    @Query('direction') direction: unknown,
+    @Query('direction', new ZodValidationPipe(DirectionSchema))
+    direction: Direction,
   ): Promise<TopicDetailDto> {
-    return this.progress.get_topic(
-      user.user_id,
-      topic_id,
-      parse_direction(direction),
-    );
+    return this.progress.getTopic(user.user_id, topic_id, direction);
   }
 
   @Get('topics/:topic_id/review')
@@ -78,16 +78,13 @@ export class VocabularyController {
     summary: 'Get a topic with only the words answered wrong in one direction',
   })
   @ApiQuery(DIRECTION_QUERY)
-  get_review(
+  getReview(
     @CurrentUser() user: AuthUser,
     @Param('topic_id') topic_id: string,
-    @Query('direction') direction: unknown,
+    @Query('direction', new ZodValidationPipe(DirectionSchema))
+    direction: Direction,
   ): Promise<TopicDetailDto> {
-    return this.progress.get_review(
-      user.user_id,
-      topic_id,
-      parse_direction(direction),
-    );
+    return this.progress.getReview(user.user_id, topic_id, direction);
   }
 
   @Delete('topics/:topic_id/progress')
@@ -97,26 +94,24 @@ export class VocabularyController {
       'Reset progress and answer logs of one topic (one or both directions)',
   })
   @ApiQuery(OPTIONAL_DIRECTION_QUERY)
-  async reset_topic(
+  async resetTopic(
     @CurrentUser() user: AuthUser,
     @Param('topic_id') topic_id: string,
-    @Query('direction') direction: unknown,
+    @Query('direction', new ZodValidationPipe(OptionalDirectionSchema))
+    direction: Direction | null,
   ): Promise<void> {
-    await this.progress.reset_topic(
-      user.user_id,
-      topic_id,
-      parse_optional_direction(direction),
-    );
+    await this.progress.resetTopic(user.user_id, topic_id, direction);
   }
 
   @Post('answers')
   @HttpCode(200)
   @ApiOperation({ summary: 'Submit an answer, grade it and record progress' })
-  submit_answer(
+  submitAnswer(
     @CurrentUser() user: AuthUser,
-    @Body() body: unknown,
+    @Body(new ZodValidationPipe(SubmitAnswerDtoSchema))
+    dto: SubmitAnswerDto,
   ): Promise<SubmitAnswerResult> {
-    return this.progress.submit_answer(user.user_id, parse_submit_answer(body));
+    return this.progress.submitAnswer(user.user_id, dto);
   }
 
   @Get('summary')
@@ -126,9 +121,10 @@ export class VocabularyController {
   @ApiQuery(DIRECTION_QUERY)
   summary(
     @CurrentUser() user: AuthUser,
-    @Query('direction') direction: unknown,
+    @Query('direction', new ZodValidationPipe(DirectionSchema))
+    direction: Direction,
   ): Promise<SummaryDto> {
-    return this.progress.summary(user.user_id, parse_direction(direction));
+    return this.progress.summary(user.user_id, direction);
   }
 
   @Delete('progress')
@@ -140,11 +136,9 @@ export class VocabularyController {
   @ApiQuery(OPTIONAL_DIRECTION_QUERY)
   async reset(
     @CurrentUser() user: AuthUser,
-    @Query('direction') direction: unknown,
+    @Query('direction', new ZodValidationPipe(OptionalDirectionSchema))
+    direction: Direction | null,
   ): Promise<void> {
-    await this.progress.reset(
-      user.user_id,
-      parse_optional_direction(direction),
-    );
+    await this.progress.reset(user.user_id, direction);
   }
 }

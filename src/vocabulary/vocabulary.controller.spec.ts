@@ -8,7 +8,7 @@ import { Types } from 'mongoose';
 import {
   mongoose_test_module,
   start_mongo,
-} from '../test-utils/mongo-memory.js';
+} from '../../test/utils/mongo-memory.js';
 import { VocabularyModule } from './vocabulary.module.js';
 import { SeedService } from './seed/seed.service.js';
 import { AnswerGrader } from './grading/answer-grader.service.js';
@@ -57,12 +57,12 @@ describe('VocabularyController', () => {
       .lean();
     word_id = String((w as any)._id);
     const tokens = app.get(TokenService);
-    token_a = await tokens.sign_access_token({
+    token_a = await tokens.signAccessToken({
       user_id: id_a,
       email: 'a@x.com',
       role: 'user',
     });
-    token_b = await tokens.sign_access_token({
+    token_b = await tokens.signAccessToken({
       user_id: id_b,
       email: 'b@x.com',
       role: 'user',

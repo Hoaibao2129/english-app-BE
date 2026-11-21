@@ -11,20 +11,20 @@ export class GroqService {
 
   constructor(private readonly config: ConfigService) {}
 
-  is_configured(): boolean {
-    return !!this.api_key();
+  isConfigured(): boolean {
+    return !!this.apiKey();
   }
 
-  private api_key(): string {
+  private apiKey(): string {
     return (this.config.get<string>('GROQ_API_KEY') ?? '').trim();
   }
 
-  async complete_json(
+  async completeJson(
     system: string,
     user: string,
     timeout_ms = DEFAULT_TIMEOUT_MS,
   ): Promise<Record<string, unknown> | null> {
-    const key = this.api_key();
+    const key = this.apiKey();
     if (!key) {
       this.logger.warn('GROQ_API_KEY not set; skipping Groq call');
       return null;

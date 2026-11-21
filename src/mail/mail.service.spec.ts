@@ -20,7 +20,7 @@ describe('MailService', () => {
     });
     service.transport = { sendMail: send_mail };
 
-    await service.send_otp_email('user@example.com', '123456', 5);
+    await service.sendOtpEmail('user@example.com', '123456', 5);
 
     expect(send_mail).toHaveBeenCalledTimes(1);
     const message = send_mail.mock.calls[0][0];
@@ -34,7 +34,7 @@ describe('MailService', () => {
     const service = make_service({});
     expect(service.transport).toBeNull();
     await expect(
-      service.send_otp_email('user@example.com', '123456', 5),
+      service.sendOtpEmail('user@example.com', '123456', 5),
     ).resolves.toBeUndefined();
   });
 
@@ -45,7 +45,7 @@ describe('MailService', () => {
     service.transport = { sendMail: send_mail };
 
     await expect(
-      service.send_otp_email('user@example.com', '123456', 5),
+      service.sendOtpEmail('user@example.com', '123456', 5),
     ).rejects.toThrow('smtp down');
   });
 });

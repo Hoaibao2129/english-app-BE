@@ -34,19 +34,19 @@ describe('GroqService', () => {
 
   it('returns null and never calls fetch without key', async () => {
     const svc = await build({});
-    expect(svc.is_configured()).toBe(false);
-    expect(await svc.complete_json('s', 'u')).toBeNull();
+    expect(svc.isConfigured()).toBe(false);
+    expect(await svc.completeJson('s', 'u')).toBeNull();
     expect(fetch_spy).not.toHaveBeenCalled();
   });
 
   it('treats a whitespace-only key as not configured and trims keys', async () => {
     const blank = await build({ GROQ_API_KEY: '   ' });
-    expect(blank.is_configured()).toBe(false);
-    expect(await blank.complete_json('s', 'u')).toBeNull();
+    expect(blank.isConfigured()).toBe(false);
+    expect(await blank.completeJson('s', 'u')).toBeNull();
     expect(fetch_spy).not.toHaveBeenCalled();
     fetch_spy.mockResolvedValue(reply('{"a":1}'));
     const svc = await build({ GROQ_API_KEY: ' k1 ' });
-    await svc.complete_json('s', 'u');
+    await svc.completeJson('s', 'u');
     const init = fetch_spy.mock.calls[0][1] as RequestInit;
     expect((init.headers as Record<string, string>).Authorization).toBe(
       'Bearer k1',
@@ -57,16 +57,16 @@ describe('GroqService', () => {
     fetch_spy.mockResolvedValue(reply('{"a":1}'));
     const timeout_spy = jest.spyOn(AbortSignal, 'timeout');
     const svc = await build({ GROQ_API_KEY: 'k1' });
-    await svc.complete_json('s', 'u');
-    await svc.complete_json('s', 'u', 30000);
+    await svc.completeJson('s', 'u');
+    await svc.completeJson('s', 'u', 30000);
     expect(timeout_spy.mock.calls).toEqual([[8000], [30000]]);
   });
 
   it('sends bearer key, model, json response_format', async () => {
     fetch_spy.mockResolvedValue(reply('{"a":1}'));
     const svc = await build({ GROQ_API_KEY: 'k1', GROQ_MODEL: 'm1' });
-    expect(svc.is_configured()).toBe(true);
-    await svc.complete_json('sys', 'usr');
+    expect(svc.isConfigured()).toBe(true);
+    await svc.completeJson('sys', 'usr');
     const [url, init] = fetch_spy.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://api.groq.com/openai/v1/chat/completions');
     expect(init.method).toBe('POST');
@@ -87,32 +87,32 @@ describe('GroqService', () => {
   it('parses choices[0].message.content into an object', async () => {
     fetch_spy.mockResolvedValue(reply('{"correct":true}'));
     const svc = await build({ GROQ_API_KEY: 'k' });
-    expect(await svc.complete_json('s', 'u')).toEqual({ correct: true });
+    expect(await svc.completeJson('s', 'u')).toEqual({ correct: true });
   });
 
   it('returns null on 500', async () => {
     fetch_spy.mockResolvedValue(new Response('err', { status: 500 }));
     const svc = await build({ GROQ_API_KEY: 'k' });
-    expect(await svc.complete_json('s', 'u')).toBeNull();
+    expect(await svc.completeJson('s', 'u')).toBeNull();
   });
 
   it('returns null on content "not json"', async () => {
     fetch_spy.mockResolvedValue(reply('not json'));
     const svc = await build({ GROQ_API_KEY: 'k' });
-    expect(await svc.complete_json('s', 'u')).toBeNull();
+    expect(await svc.completeJson('s', 'u')).toBeNull();
   });
 
   it('returns null for non-object content (array, null, number)', async () => {
     const svc = await build({ GROQ_API_KEY: 'k' });
     for (const c of ['[1]', 'null', '5', '"x"']) {
       fetch_spy.mockResolvedValueOnce(reply(c));
-      expect(await svc.complete_json('s', 'u')).toBeNull();
+      expect(await svc.completeJson('s', 'u')).toBeNull();
     }
   });
 
   it('returns null when fetch rejects (timeout)', async () => {
     fetch_spy.mockRejectedValue(new DOMException('timeout', 'TimeoutError'));
     const svc = await build({ GROQ_API_KEY: 'k' });
-    expect(await svc.complete_json('s', 'u')).toBeNull();
+    expect(await svc.completeJson('s', 'u')).toBeNull();
   });
 });

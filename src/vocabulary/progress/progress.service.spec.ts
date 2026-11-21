@@ -8,7 +8,7 @@ import { Model, Types } from 'mongoose';
 import {
   mongoose_test_module,
   start_mongo,
-} from '../../test-utils/mongo-memory.js';
+} from '../../../test/utils/mongo-memory.js';
 import { VocabularyModule } from '../vocabulary.module.js';
 import { SeedService } from '../seed/seed.service.js';
 import { AnswerGrader } from '../grading/answer-grader.service.js';
@@ -103,7 +103,7 @@ describe('ProgressService', () => {
     user_id: string = user_a,
   ) =>
     word_id(en).then((id) =>
-      service.submit_answer(user_id, {
+      service.submitAnswer(user_id, {
         word_id: id,
         direction,
         mode: 'quiz',
@@ -116,7 +116,7 @@ describe('ProgressService', () => {
     grade.mockResolvedValueOnce({ is_correct: false, graded_by: 'ai' });
     await answer('day');
     await answer('week');
-    const list = await service.list_topics(user_a, 'en_vi');
+    const list = await service.listTopics(user_a, 'en_vi');
     expect(list.map((t) => t.order)).toEqual([1, 2, 3]);
     expect(list[0]).toMatchObject({
       title: 'Time',
@@ -142,7 +142,7 @@ describe('ProgressService', () => {
   it('marks a topic completed when all words are correct', async () => {
     grade.mockResolvedValue({ is_correct: true, graded_by: 'exact' });
     await answer('rice');
-    const list = await service.list_topics(user_a, 'en_vi');
+    const list = await service.listTopics(user_a, 'en_vi');
     expect(list[1].status).toBe('completed');
   });
 
@@ -151,7 +151,7 @@ describe('ProgressService', () => {
     grade.mockResolvedValueOnce({ is_correct: false, graded_by: 'ai' });
     await answer('day');
     await answer('day');
-    const t = (await service.list_topics(user_a, 'en_vi'))[0];
+    const t = (await service.listTopics(user_a, 'en_vi'))[0];
     expect([t.correct, t.wrong]).toEqual([0, 1]);
   });
 
@@ -190,9 +190,9 @@ describe('ProgressService', () => {
     await answer('day', 'en_vi');
     await answer('week', 'en_vi');
     await answer('rice', 'en_vi');
-    const en_vi = await service.list_topics(user_a, 'en_vi');
+    const en_vi = await service.listTopics(user_a, 'en_vi');
     expect(en_vi[0]).toMatchObject({ correct: 2, status: 'completed' });
-    const vi_en = await service.list_topics(user_a, 'vi_en');
+    const vi_en = await service.listTopics(user_a, 'vi_en');
     expect(vi_en[0]).toMatchObject({
       correct: 0,
       wrong: 0,
@@ -215,16 +215,16 @@ describe('ProgressService', () => {
     grade.mockResolvedValueOnce({ is_correct: false, graded_by: 'ai' });
     await answer('day', 'en_vi');
     await answer('day', 'vi_en');
-    const [time] = await service.list_topics(user_a, 'en_vi');
-    const en_vi = await service.get_topic(user_a, time.id, 'en_vi');
+    const [time] = await service.listTopics(user_a, 'en_vi');
+    const en_vi = await service.getTopic(user_a, time.id, 'en_vi');
     expect(en_vi.direction).toBe('en_vi');
     expect(en_vi.words.map((w) => w.status)).toEqual(['correct', 'new']);
-    const vi_en = await service.get_topic(user_a, time.id, 'vi_en');
+    const vi_en = await service.getTopic(user_a, time.id, 'vi_en');
     expect(vi_en.words.map((w) => w.status)).toEqual(['wrong', 'new']);
-    expect((await service.get_review(user_a, time.id, 'en_vi')).words).toEqual(
+    expect((await service.getReview(user_a, time.id, 'en_vi')).words).toEqual(
       [],
     );
-    const review = await service.get_review(user_a, time.id, 'vi_en');
+    const review = await service.getReview(user_a, time.id, 'vi_en');
     expect(review.words.map((w) => w.word)).toEqual(['day']);
     expect([review.correct, review.wrong, review.direction]).toEqual([
       0,
@@ -275,16 +275,16 @@ describe('ProgressService', () => {
     await answer('day', 'en_vi');
     await answer('day', 'vi_en');
     await answer('rice', 'vi_en');
-    const [time, food] = await service.list_topics(user_a, 'vi_en');
-    await service.reset_topic(user_a, time.id, 'vi_en');
-    expect((await service.list_topics(user_a, 'vi_en'))[0].correct).toBe(0);
-    expect((await service.list_topics(user_a, 'en_vi'))[0].correct).toBe(1);
-    expect((await service.get_topic(user_a, food.id, 'vi_en')).correct).toBe(1);
+    const [time, food] = await service.listTopics(user_a, 'vi_en');
+    await service.resetTopic(user_a, time.id, 'vi_en');
+    expect((await service.listTopics(user_a, 'vi_en'))[0].correct).toBe(0);
+    expect((await service.listTopics(user_a, 'en_vi'))[0].correct).toBe(1);
+    expect((await service.getTopic(user_a, food.id, 'vi_en')).correct).toBe(1);
     expect(
       await logs.countDocuments({ topic_id: new Types.ObjectId(time.id) }),
     ).toBe(1);
-    await service.reset_topic(user_a, time.id, null);
-    expect((await service.list_topics(user_a, 'en_vi'))[0].correct).toBe(0);
+    await service.resetTopic(user_a, time.id, null);
+    expect((await service.listTopics(user_a, 'en_vi'))[0].correct).toBe(0);
   });
 
   it('ungraded answer writes answerlog with is_correct null and leaves progress untouched', async () => {
@@ -299,7 +299,7 @@ describe('ProgressService', () => {
     const log = await logs.findOne().lean();
     expect(log?.is_correct).toBeNull();
     expect(log?.graded_by).toBe('ungraded');
-    const t = (await service.list_topics(user_a, 'en_vi'))[0];
+    const t = (await service.listTopics(user_a, 'en_vi'))[0];
     expect([t.correct, t.wrong, t.not_started]).toEqual([0, 0, 2]);
   });
 
@@ -367,8 +367,8 @@ describe('ProgressService', () => {
     grade.mockResolvedValueOnce({ is_correct: false, graded_by: 'ai' });
     await answer('day');
     await answer('week');
-    const t = (await service.list_topics(user_a, 'en_vi'))[0];
-    const d = await service.get_topic(user_a, t.id, 'en_vi');
+    const t = (await service.listTopics(user_a, 'en_vi'))[0];
+    const d = await service.getTopic(user_a, t.id, 'en_vi');
     expect(d.words.map((w) => [w.word, w.meaning, w.status])).toEqual([
       ['day', 'ngày', 'correct'],
       ['week', 'tuần', 'wrong'],
@@ -384,16 +384,16 @@ describe('ProgressService', () => {
 
   it('get_topic throws 400 for invalid id and 404 for missing', async () => {
     await expect(
-      service.get_topic(user_a, 'abc', 'en_vi'),
+      service.getTopic(user_a, 'abc', 'en_vi'),
     ).rejects.toBeInstanceOf(BadRequestException);
     await expect(
-      service.get_topic(user_a, String(new Types.ObjectId()), 'en_vi'),
+      service.getTopic(user_a, String(new Types.ObjectId()), 'en_vi'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('submit_answer throws 404 for unknown word', async () => {
     await expect(
-      service.submit_answer(user_a, {
+      service.submitAnswer(user_a, {
         word_id: String(new Types.ObjectId()),
         direction: 'en_vi',
         mode: 'quiz',
@@ -405,10 +405,10 @@ describe('ProgressService', () => {
   it('user A answers; user B list_topics shows 0 correct / 0 wrong', async () => {
     grade.mockResolvedValue({ is_correct: true, graded_by: 'exact' });
     await answer('day', 'en_vi', user_a);
-    const b = await service.list_topics(user_b, 'en_vi');
+    const b = await service.listTopics(user_b, 'en_vi');
     expect(b.every((t) => t.correct === 0 && t.wrong === 0)).toBe(true);
     expect((await service.summary(user_b, 'en_vi')).learned_words).toBe(0);
-    const detail = await service.get_topic(user_b, b[0].id, 'en_vi');
+    const detail = await service.getTopic(user_b, b[0].id, 'en_vi');
     expect(detail.words.every((w) => w.status === 'new')).toBe(true);
   });
 
@@ -434,8 +434,8 @@ describe('ProgressService', () => {
     grade.mockResolvedValueOnce({ is_correct: false, graded_by: 'ai' });
     await answer('day');
     await answer('week');
-    const t = (await service.list_topics(user_a, 'en_vi'))[0];
-    const r = await service.get_review(user_a, t.id, 'en_vi');
+    const t = (await service.listTopics(user_a, 'en_vi'))[0];
+    const r = await service.getReview(user_a, t.id, 'en_vi');
     expect(r.words.map((w) => w.word)).toEqual(['week']);
     expect([r.total_words, r.correct, r.wrong]).toEqual([2, 1, 1]);
   });
@@ -444,15 +444,15 @@ describe('ProgressService', () => {
     grade.mockResolvedValueOnce({ is_correct: false, graded_by: 'ai' });
     grade.mockResolvedValueOnce({ is_correct: true, graded_by: 'exact' });
     await answer('rice');
-    await service.submit_answer(user_a, {
+    await service.submitAnswer(user_a, {
       word_id: await word_id('rice'),
       direction: 'en_vi',
       mode: 'review',
       answer: 'cơm',
     });
-    const t = (await service.list_topics(user_a, 'en_vi'))[1];
+    const t = (await service.listTopics(user_a, 'en_vi'))[1];
     expect([t.correct, t.wrong, t.status]).toEqual([1, 0, 'completed']);
-    expect((await service.get_review(user_a, t.id, 'en_vi')).words).toEqual([]);
+    expect((await service.getReview(user_a, t.id, 'en_vi')).words).toEqual([]);
     expect((await logs.findOne({ mode: 'review' }).lean())?.is_correct).toBe(
       true,
     );
@@ -463,27 +463,27 @@ describe('ProgressService', () => {
     await answer('day');
     await answer('rice');
     await answer('day', 'en_vi', user_b);
-    const [time] = await service.list_topics(user_a, 'en_vi');
-    await service.reset_topic(user_a, time.id, null);
-    const [time_after, food_after] = await service.list_topics(user_a, 'en_vi');
+    const [time] = await service.listTopics(user_a, 'en_vi');
+    await service.resetTopic(user_a, time.id, null);
+    const [time_after, food_after] = await service.listTopics(user_a, 'en_vi');
     expect(time_after.status).toBe('not_started');
     expect(food_after.correct).toBe(1);
     expect(
       await logs.countDocuments({ user_id: new Types.ObjectId(user_a) }),
     ).toBe(1);
-    expect((await service.list_topics(user_b, 'en_vi'))[0].correct).toBe(1);
+    expect((await service.listTopics(user_b, 'en_vi'))[0].correct).toBe(1);
   });
 
   it('reset_topic and get_review throw 400 for invalid id and 404 for missing', async () => {
     const missing = String(new Types.ObjectId());
     await expect(
-      service.reset_topic(user_a, 'abc', null),
+      service.resetTopic(user_a, 'abc', null),
     ).rejects.toBeInstanceOf(BadRequestException);
     await expect(
-      service.reset_topic(user_a, missing, null),
+      service.resetTopic(user_a, missing, null),
     ).rejects.toBeInstanceOf(NotFoundException);
     await expect(
-      service.get_review(user_a, missing, 'en_vi'),
+      service.getReview(user_a, missing, 'en_vi'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
